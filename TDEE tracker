@@ -1,0 +1,3466 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CalTrack - Monitoraggio Calorie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        /* Dark mode styles */
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+            background: #2d3748;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4a5568;
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #718096;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#5D5CDE',
+                        secondary: '#4F46E5',
+                        accent: '#818CF8',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+        
+        // Check for dark mode preference
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark');
+        }
+        
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+            if (event.matches) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        });
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
+    <div id="app" class="flex flex-col min-h-screen">
+        <!-- Header/Navigation -->
+        <header class="bg-white dark:bg-gray-800 shadow-md">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                        <path d="M2 17l10 5 10-5" />
+                        <path d="M2 12l10 5 10-5" />
+                    </svg>
+                    <h1 class="ml-2 text-xl font-bold text-primary">CalTrack</h1>
+                </div>
+                <nav class="hidden md:flex space-x-6">
+                    <button id="nav-dashboard" class="nav-link font-medium hover:text-primary transition-colors">Dashboard</button>
+                    <button id="nav-food" class="nav-link font-medium hover:text-primary transition-colors">Diario Alimentare</button>
+                    <button id="nav-activity" class="nav-link font-medium hover:text-primary transition-colors">Attività</button>
+                    <button id="nav-progress" class="nav-link font-medium hover:text-primary transition-colors">Progressi</button>
+                    <button id="nav-settings" class="nav-link font-medium hover:text-primary transition-colors">Impostazioni</button>
+                </nav>
+                <div class="flex items-center space-x-3">
+                    <div id="user-info" class="hidden items-center">
+                        <span id="username-display" class="mr-2 text-sm font-medium"></span>
+                        <button id="logout-btn" class="text-sm text-red-500 hover:text-red-700">Esci</button>
+                    </div>
+                    <button id="login-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Accedi</button>
+                    <button id="mobile-menu-btn" class="md:hidden p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <!-- Mobile menu -->
+            <div id="mobile-menu" class="hidden md:hidden px-4 py-3 bg-gray-50 dark:bg-gray-700 shadow-inner">
+                <div class="flex flex-col space-y-3">
+                    <button class="nav-link font-medium hover:text-primary transition-colors" data-target="dashboard">Dashboard</button>
+                    <button class="nav-link font-medium hover:text-primary transition-colors" data-target="food">Diario Alimentare</button>
+                    <button class="nav-link font-medium hover:text-primary transition-colors" data-target="activity">Attività</button>
+                    <button class="nav-link font-medium hover:text-primary transition-colors" data-target="progress">Progressi</button>
+                    <button class="nav-link font-medium hover:text-primary transition-colors" data-target="settings">Impostazioni</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="container mx-auto px-4 py-6 flex-grow">
+            <!-- Welcome/Login Screen -->
+            <div id="welcome-screen" class="flex flex-col items-center justify-center h-full">
+                <div class="text-center max-w-2xl">
+                    <h1 class="text-4xl font-bold mb-6 text-primary">Benvenuto su CalTrack</h1>
+                    <p class="text-xl mb-8">Il tuo assistente personale per il monitoraggio delle calorie e il raggiungimento dei tuoi obiettivi di fitness.</p>
+                    <div class="flex flex-col sm:flex-row justify-center gap-4">
+                        <button id="start-login" class="px-6 py-3 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Accedi</button>
+                        <button id="start-register" class="px-6 py-3 bg-white dark:bg-gray-800 border border-primary text-primary rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Registrati</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Screen -->
+            <div id="dashboard-screen" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="col-span-1 md:col-span-2">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                            <h2 class="text-2xl font-bold mb-4">Riepilogo Giornaliero</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                                    <h3 class="text-sm font-medium text-blue-700 dark:text-blue-300">Calorie Obiettivo</h3>
+                                    <p id="target-calories" class="text-2xl font-bold">0</p>
+                                </div>
+                                <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded-lg">
+                                    <h3 class="text-sm font-medium text-green-700 dark:text-green-300">Calorie Consumate</h3>
+                                    <p id="consumed-calories" class="text-2xl font-bold">0</p>
+                                </div>
+                                <div class="bg-purple-50 dark:bg-purple-900/20 p-4 rounded-lg">
+                                    <h3 class="text-sm font-medium text-purple-700 dark:text-purple-300">Calorie Rimanenti</h3>
+                                    <p id="remaining-calories" class="text-2xl font-bold">0</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-2xl font-bold">Macronutrienti</h2>
+                                <div class="text-sm text-gray-500 dark:text-gray-400">
+                                    <span id="current-date"></span>
+                                </div>
+                            </div>
+                            <div class="relative h-8 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                <div id="protein-bar" class="absolute top-0 left-0 h-full bg-blue-500" style="width: 0%"></div>
+                                <div id="carbs-bar" class="absolute top-0 left-0 h-full bg-green-500" style="width: 0%"></div>
+                                <div id="fat-bar" class="absolute top-0 left-0 h-full bg-red-500" style="width: 0%"></div>
+                            </div>
+                            <div class="flex justify-between mt-2">
+                                <div class="flex items-center">
+                                    <div class="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                                    <span>Proteine: <span id="protein-value">0g</span></span>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                                    <span>Carboidrati: <span id="carbs-value">0g</span></span>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                                    <span>Grassi: <span id="fat-value">0g</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-2xl font-bold">Andamento Calorico</h2>
+                                <select id="chart-timeframe" class="text-sm border border-gray-300 dark:border-gray-600 rounded-md p-1 bg-white dark:bg-gray-700">
+                                    <option value="week">Ultima settimana</option>
+                                    <option value="month">Ultimo mese</option>
+                                </select>
+                            </div>
+                            <div class="h-64">
+                                <canvas id="calories-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-span-1">
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                            <h2 class="text-2xl font-bold mb-4">Il tuo TDEE</h2>
+                            <div class="flex items-center justify-center mb-4">
+                                <div class="text-center">
+                                    <p id="tdee-value" class="text-4xl font-bold text-primary">0</p>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">calorie/giorno</p>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold mb-2">Componenti TDEE:</h3>
+                                <div class="space-y-2 text-sm">
+                                    <div class="flex justify-between">
+                                        <span>BMR:</span>
+                                        <span id="bmr-component" class="font-medium">0 kcal</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Lavoro:</span>
+                                        <span id="work-component" class="font-medium">0 kcal</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Attività fisica:</span>
+                                        <span id="exercise-component" class="font-medium">0 kcal</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Passi:</span>
+                                        <span id="steps-component" class="font-medium">0 kcal</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>TEF (Effetto termico):</span>
+                                        <span id="tef-component" class="font-medium">0 kcal</span>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <button id="recalculate-tdee" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Ricalcola TDEE</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                            <h2 class="text-2xl font-bold mb-4">Pasti di Oggi</h2>
+                            <div id="today-meals" class="space-y-3">
+                                <p class="text-gray-500 dark:text-gray-400 text-center">Nessun pasto registrato oggi</p>
+                            </div>
+                            <div class="mt-4">
+                                <button id="add-meal-btn" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Aggiungi Pasto</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                            <h2 class="text-2xl font-bold mb-4">Attività di Oggi</h2>
+                            <div id="today-activities" class="space-y-3">
+                                <p class="text-gray-500 dark:text-gray-400 text-center">Nessuna attività registrata oggi</p>
+                            </div>
+                            <div class="mt-4">
+                                <button id="add-activity-btn" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">Aggiungi Attività</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Food Diary Screen -->
+            <div id="food-screen" class="hidden">
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">Diario Alimentare</h2>
+                        <div class="flex items-center">
+                            <button id="prev-date" class="p-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                            <span id="food-date" class="text-lg font-medium mx-2">Oggi</span>
+                            <button id="next-date" class="p-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="meals-container" class="space-y-6">
+                        <div id="breakfast-section" class="meal-section">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-lg font-semibold">Colazione</h3>
+                                <button class="add-food-btn px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-secondary transition-colors" data-meal="breakfast">
+                                    Aggiungi Cibo
+                                </button>
+                            </div>
+                            <div class="breakfast-items food-items space-y-2">
+                                <p class="text-gray-500 dark:text-gray-400 text-center">Nessun alimento registrato</p>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                <div class="flex justify-between text-sm">
+                                    <span>Totale:</span>
+                                    <span class="meal-total" data-meal="breakfast">0 kcal</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="lunch-section" class="meal-section">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-lg font-semibold">Pranzo</h3>
+                                <button class="add-food-btn px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-secondary transition-colors" data-meal="lunch">
+                                    Aggiungi Cibo
+                                </button>
+                            </div>
+                            <div class="lunch-items food-items space-y-2">
+                                <p class="text-gray-500 dark:text-gray-400 text-center">Nessun alimento registrato</p>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                <div class="flex justify-between text-sm">
+                                    <span>Totale:</span>
+                                    <span class="meal-total" data-meal="lunch">0 kcal</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="dinner-section" class="meal-section">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-lg font-semibold">Cena</h3>
+                                <button class="add-food-btn px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-secondary transition-colors" data-meal="dinner">
+                                    Aggiungi Cibo
+                                </button>
+                            </div>
+                            <div class="dinner-items food-items space-y-2">
+                                <p class="text-gray-500 dark:text-gray-400 text-center">Nessun alimento registrato</p>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                <div class="flex justify-between text-sm">
+                                    <span>Totale:</span>
+                                    <span class="meal-total" data-meal="dinner">0 kcal</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="snacks-section" class="meal-section">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-lg font-semibold">Spuntini</h3>
+                                <button class="add-food-btn px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-secondary transition-colors" data-meal="snacks">
+                                    Aggiungi Cibo
+                                </button>
+                            </div>
+                            <div class="snacks-items food-items space-y-2">
+                                <p class="text-gray-500 dark:text-gray-400 text-center">Nessun alimento registrato</p>
+                            </div>
+                            <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                                <div class="flex justify-between text-sm">
+                                    <span>Totale:</span>
+                                    <span class="meal-total" data-meal="snacks">0 kcal</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-4 border-t-2 border-gray-200 dark:border-gray-700">
+                        <div class="flex justify-between font-semibold">
+                            <span>Totale Giornaliero:</span>
+                            <span id="daily-total">0 kcal</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-bold">Gestione Alimenti</h2>
+                        <button id="add-custom-food" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                            Crea Alimento
+                        </button>
+                    </div>
+                    <div class="mb-4">
+                        <input type="text" id="food-search" placeholder="Cerca alimenti..." class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                    </div>
+                    <div id="food-library" class="max-h-96 overflow-y-auto custom-scrollbar">
+                        <p class="text-gray-500 dark:text-gray-400 text-center">Cerca o aggiungi alimenti alla tua libreria</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Screen -->
+            <div id="activity-screen" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-2xl font-bold">Attività Fisica</h2>
+                            <div class="flex items-center">
+                                <button id="prev-activity-date" class="p-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                <span id="activity-date" class="text-lg font-medium mx-2">Oggi</span>
+                                <button id="next-activity-date" class="p-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="activities-container" class="space-y-4 mb-6">
+                            <p class="text-gray-500 dark:text-gray-400 text-center">Nessuna attività registrata</p>
+                        </div>
+
+                        <div class="flex justify-center">
+                            <button id="add-activity-form-btn" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                                Aggiungi Attività
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h2 class="text-2xl font-bold mb-6">Pianificazione Settimanale</h2>
+                        
+                        <div class="mb-6">
+                            <h3 class="text-lg font-semibold mb-3">Attività Ricorrenti</h3>
+                            <div id="recurring-activities" class="space-y-3">
+                                <p class="text-gray-500 dark:text-gray-400 text-center">Nessuna attività ricorrente configurata</p>
+                            </div>
+                            <div class="mt-4">
+                                <button id="add-recurring-activity" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                                    Aggiungi Attività Ricorrente
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-lg font-semibold mb-3">Passi Giornalieri</h3>
+                            <div class="mb-4">
+                                <label for="daily-steps" class="block text-sm font-medium mb-1">Numero di passi:</label>
+                                <div class="flex">
+                                    <input type="number" id="daily-steps" class="flex-grow px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-l-md bg-white dark:bg-gray-700 text-base" placeholder="Es. 10000">
+                                    <button id="save-steps" class="px-4 py-2 bg-primary text-white rounded-r-md hover:bg-secondary transition-colors">Salva</button>
+                                </div>
+                            </div>
+                            <div id="steps-info" class="text-sm">
+                                <p>Passi medi giornalieri: <span id="avg-steps">0</span></p>
+                                <p>Calorie bruciate da passi: <span id="steps-calories">0</span> kcal</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                    <h2 class="text-2xl font-bold mb-6">Consumo Calorico per Attività</h2>
+                    <div class="h-64">
+                        <canvas id="activity-chart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Screen -->
+            <div id="progress-screen" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h2 class="text-2xl font-bold mb-6">Andamento del Peso</h2>
+                        <div class="h-64 mb-4">
+                            <canvas id="weight-chart"></canvas>
+                        </div>
+                        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+                            <div>
+                                <p class="text-sm">Peso iniziale: <span id="initial-weight">0</span> kg</p>
+                                <p class="text-sm">Peso attuale: <span id="current-weight">0</span> kg</p>
+                                <p class="text-sm">Differenza: <span id="weight-difference">0</span> kg</p>
+                            </div>
+                            <button id="add-weight" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                                Aggiungi Peso
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h2 class="text-2xl font-bold mb-6">Misurazioni Corporee</h2>
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label for="measurement-type" class="block text-sm font-medium mb-1">Tipo:</label>
+                                <select id="measurement-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                                    <option value="chest">Torace</option>
+                                    <option value="waist">Vita</option>
+                                    <option value="hips">Fianchi</option>
+                                    <option value="thigh">Coscia</option>
+                                    <option value="arm">Braccio</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="measurement-date" class="block text-sm font-medium mb-1">Data:</label>
+                                <input type="date" id="measurement-date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                            </div>
+                            <div>
+                                <label for="measurement-value" class="block text-sm font-medium mb-1">Valore (cm):</label>
+                                <input type="number" id="measurement-value" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" step="0.1">
+                            </div>
+                            <div class="flex items-end">
+                                <button id="add-measurement" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                                    Aggiungi
+                                </button>
+                            </div>
+                        </div>
+                        <div class="h-64">
+                            <canvas id="measurements-chart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold">Confronto Foto</h2>
+                        <button id="add-photo" class="px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                            Aggiungi Foto
+                        </button>
+                    </div>
+                    <div id="photos-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <p class="text-gray-500 dark:text-gray-400 text-center col-span-full">Nessuna foto caricata</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Screen -->
+            <div id="settings-screen" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h2 class="text-2xl font-bold mb-6">Dati Personali</h2>
+                        <div class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="user-age" class="block text-sm font-medium mb-1">Età:</label>
+                                    <input type="number" id="user-age" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                                </div>
+                                <div>
+                                    <label for="user-gender" class="block text-sm font-medium mb-1">Sesso:</label>
+                                    <select id="user-gender" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                                        <option value="male">Uomo</option>
+                                        <option value="female">Donna</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="user-height" class="block text-sm font-medium mb-1">Altezza (cm):</label>
+                                    <input type="number" id="user-height" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" step="0.1">
+                                </div>
+                                <div>
+                                    <label for="user-weight" class="block text-sm font-medium mb-1">Peso (kg):</label>
+                                    <input type="number" id="user-weight" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" step="0.1">
+                                </div>
+                            </div>
+                            <div>
+                                <label for="user-bodyfat" class="block text-sm font-medium mb-1">Percentuale di Grasso Corporeo (%):</label>
+                                <input type="number" id="user-bodyfat" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" step="0.1" placeholder="Opzionale">
+                            </div>
+                            <div>
+                                <label for="user-goal" class="block text-sm font-medium mb-1">Obiettivo:</label>
+                                <select id="user-goal" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                                    <option value="lose">Perdita di peso</option>
+                                    <option value="maintain">Mantenimento</option>
+                                    <option value="gain">Aumento di peso</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="user-deficit" class="block text-sm font-medium mb-1">Deficit/Surplus calorico (kcal):</label>
+                                <input type="number" id="user-deficit" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" step="50" value="500">
+                            </div>
+                            <div class="mt-6">
+                                <button id="save-personal" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                                    Salva Dati Personali
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                        <h2 class="text-2xl font-bold mb-6">Configurazione TDEE</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="bmr-formula" class="block text-sm font-medium mb-1">Formula BMR:</label>
+                                <select id="bmr-formula" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                                    <option value="mifflin">Mifflin-St Jeor</option>
+                                    <option value="katch">Katch-McArdle (richiede % grasso)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="job-type" class="block text-sm font-medium mb-1">Tipo di Lavoro:</label>
+                                <select id="job-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                                    <option value="sedentary">Sedentario (ufficio, guida)</option>
+                                    <option value="light">Leggero (insegnante, commesso)</option>
+                                    <option value="moderate">Moderato (cameriere, idraulico)</option>
+                                    <option value="heavy">Pesante (operaio, muratore)</option>
+                                    <option value="veryheavy">Molto pesante (lavori intensi)</option>
+                                    <option value="custom">Personalizzato</option>
+                                </select>
+                            </div>
+                            <div id="custom-job-container" class="hidden">
+                                <label for="custom-job-description" class="block text-sm font-medium mb-1">Descrizione dettagliata del lavoro:</label>
+                                <textarea id="custom-job-description" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base h-24 resize-none" placeholder="Descrivi il tuo lavoro, durata, e quanto è fisicamente impegnativo..."></textarea>
+                            </div>
+                            <div>
+                                <label for="job-hours" class="block text-sm font-medium mb-1">Ore di lavoro al giorno:</label>
+                                <input type="number" id="job-hours" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0" max="24" step="0.5">
+                            </div>
+                            <div>
+                                <label for="job-days" class="block text-sm font-medium mb-1">Giorni di lavoro a settimana:</label>
+                                <input type="number" id="job-days" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0" max="7" step="1">
+                            </div>
+                            <div class="mt-6">
+                                <button id="save-tdee-config" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                                    Salva Configurazione
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+                    <h2 class="text-2xl font-bold mb-6">Account</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="text-lg font-semibold mb-3">Dati di Accesso</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="user-email" class="block text-sm font-medium mb-1">Email:</label>
+                                    <input type="email" id="user-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                                </div>
+                                <div>
+                                    <label for="user-password" class="block text-sm font-medium mb-1">Password:</label>
+                                    <input type="password" id="user-password" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                                </div>
+                                <div>
+                                    <button id="save-account" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                                        Aggiorna Dati Account
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-semibold mb-3">Gestione Dati</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <button id="export-data" class="w-full px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                                        Esporta i tuoi dati
+                                    </button>
+                                </div>
+                                <div>
+                                    <button id="import-data" class="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                        Importa dati
+                                    </button>
+                                </div>
+                                <div>
+                                    <button id="delete-account" class="w-full px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
+                                        Elimina account
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-white dark:bg-gray-800 shadow-inner py-4 mt-6">
+            <div class="container mx-auto px-4 text-center text-sm text-gray-600 dark:text-gray-400">
+                <p>&copy; 2023 CalTrack - Monitoraggio Calorie</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Accedi</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="login-email" class="block text-sm font-medium mb-1">Email:</label>
+                    <input type="email" id="login-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <label for="login-password" class="block text-sm font-medium mb-1">Password:</label>
+                    <input type="password" id="login-password" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <button id="login-submit" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                        Accedi
+                    </button>
+                </div>
+                <div class="text-center text-sm">
+                    <p>Non hai un account? <button id="switch-to-register" class="text-primary hover:underline">Registrati</button></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="register-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Registrati</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="register-name" class="block text-sm font-medium mb-1">Nome:</label>
+                    <input type="text" id="register-name" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <label for="register-email" class="block text-sm font-medium mb-1">Email:</label>
+                    <input type="email" id="register-email" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <label for="register-password" class="block text-sm font-medium mb-1">Password:</label>
+                    <input type="password" id="register-password" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <label for="register-confirm" class="block text-sm font-medium mb-1">Conferma Password:</label>
+                    <input type="password" id="register-confirm" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <button id="register-submit" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                        Registrati
+                    </button>
+                </div>
+                <div class="text-center text-sm">
+                    <p>Hai già un account? <button id="switch-to-login" class="text-primary hover:underline">Accedi</button></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Food Modal -->
+    <div id="add-food-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Aggiungi Alimento</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="food-search-modal" class="block text-sm font-medium mb-1">Cerca alimento:</label>
+                    <input type="text" id="food-search-modal" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" placeholder="Nome alimento...">
+                </div>
+                <div id="food-search-results" class="max-h-60 overflow-y-auto custom-scrollbar space-y-2 border border-gray-200 dark:border-gray-700 rounded-md p-2">
+                    <p class="text-gray-500 dark:text-gray-400 text-center">Cerca un alimento</p>
+                </div>
+                <div id="selected-food-info" class="hidden space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <div>
+                        <h3 id="selected-food-name" class="font-semibold text-lg"></h3>
+                        <p id="selected-food-calories" class="text-sm"></p>
+                    </div>
+                    <div>
+                        <label for="food-quantity" class="block text-sm font-medium mb-1">Quantità (g):</label>
+                        <input type="number" id="food-quantity" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="1" value="100">
+                    </div>
+                    <div>
+                        <label for="food-meal" class="block text-sm font-medium mb-1">Pasto:</label>
+                        <select id="food-meal" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                            <option value="breakfast">Colazione</option>
+                            <option value="lunch">Pranzo</option>
+                            <option value="dinner">Cena</option>
+                            <option value="snacks">Spuntino</option>
+                        </select>
+                    </div>
+                    <div>
+                        <button id="add-food-submit" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                            Aggiungi
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Custom Food Modal -->
+    <div id="create-food-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Crea Alimento Personalizzato</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="custom-food-name" class="block text-sm font-medium mb-1">Nome alimento:</label>
+                    <input type="text" id="custom-food-name" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <label for="custom-food-calories" class="block text-sm font-medium mb-1">Calorie (per 100g):</label>
+                    <input type="number" id="custom-food-calories" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0">
+                </div>
+                <div>
+                    <label for="custom-food-protein" class="block text-sm font-medium mb-1">Proteine (g per 100g):</label>
+                    <input type="number" id="custom-food-protein" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0" step="0.1">
+                </div>
+                <div>
+                    <label for="custom-food-carbs" class="block text-sm font-medium mb-1">Carboidrati (g per 100g):</label>
+                    <input type="number" id="custom-food-carbs" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0" step="0.1">
+                </div>
+                <div>
+                    <label for="custom-food-fat" class="block text-sm font-medium mb-1">Grassi (g per 100g):</label>
+                    <input type="number" id="custom-food-fat" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0" step="0.1">
+                </div>
+                <div>
+                    <button id="save-custom-food" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                        Salva Alimento
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Activity Modal -->
+    <div id="add-activity-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Aggiungi Attività</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="activity-type" class="block text-sm font-medium mb-1">Tipo di attività:</label>
+                    <select id="activity-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                        <option value="running">Corsa</option>
+                        <option value="walking">Camminata</option>
+                        <option value="cycling">Ciclismo</option>
+                        <option value="swimming">Nuoto</option>
+                        <option value="weightlifting">Sollevamento pesi</option>
+                        <option value="yoga">Yoga</option>
+                        <option value="other">Altro</option>
+                    </select>
+                </div>
+                <div id="activity-distance-container">
+                    <label for="activity-distance" class="block text-sm font-medium mb-1">Distanza (km):</label>
+                    <input type="number" id="activity-distance" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0" step="0.1">
+                </div>
+                <div>
+                    <label for="activity-duration" class="block text-sm font-medium mb-1">Durata (minuti):</label>
+                    <input type="number" id="activity-duration" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0">
+                </div>
+                <div>
+                    <label for="activity-date" class="block text-sm font-medium mb-1">Data:</label>
+                    <input type="date" id="activity-date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <button id="add-activity-submit" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                        Aggiungi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Recurring Activity Modal -->
+    <div id="recurring-activity-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Attività Settimanale</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="recurring-activity-type" class="block text-sm font-medium mb-1">Tipo di attività:</label>
+                    <select id="recurring-activity-type" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                        <option value="running">Corsa</option>
+                        <option value="walking">Camminata</option>
+                        <option value="cycling">Ciclismo</option>
+                        <option value="swimming">Nuoto</option>
+                        <option value="weightlifting">Sollevamento pesi</option>
+                        <option value="yoga">Yoga</option>
+                        <option value="other">Altro</option>
+                    </select>
+                </div>
+                <div id="recurring-distance-container">
+                    <label for="recurring-distance" class="block text-sm font-medium mb-1">Distanza (km):</label>
+                    <input type="number" id="recurring-distance" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0" step="0.1">
+                </div>
+                <div>
+                    <label for="recurring-duration" class="block text-sm font-medium mb-1">Durata (minuti):</label>
+                    <input type="number" id="recurring-duration" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0">
+                </div>
+                <div>
+                    <label for="recurring-frequency" class="block text-sm font-medium mb-1">Frequenza (volte a settimana):</label>
+                    <input type="number" id="recurring-frequency" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="1" max="7">
+                </div>
+                <div>
+                    <p class="text-sm font-medium mb-1">Giorni della settimana:</p>
+                    <div class="grid grid-cols-7 gap-1 mt-2">
+                        <div class="text-center">
+                            <input type="checkbox" id="day-mon" class="form-checkbox">
+                            <label for="day-mon" class="block text-xs">Lun</label>
+                        </div>
+                        <div class="text-center">
+                            <input type="checkbox" id="day-tue" class="form-checkbox">
+                            <label for="day-tue" class="block text-xs">Mar</label>
+                        </div>
+                        <div class="text-center">
+                            <input type="checkbox" id="day-wed" class="form-checkbox">
+                            <label for="day-wed" class="block text-xs">Mer</label>
+                        </div>
+                        <div class="text-center">
+                            <input type="checkbox" id="day-thu" class="form-checkbox">
+                            <label for="day-thu" class="block text-xs">Gio</label>
+                        </div>
+                        <div class="text-center">
+                            <input type="checkbox" id="day-fri" class="form-checkbox">
+                            <label for="day-fri" class="block text-xs">Ven</label>
+                        </div>
+                        <div class="text-center">
+                            <input type="checkbox" id="day-sat" class="form-checkbox">
+                            <label for="day-sat" class="block text-xs">Sab</label>
+                        </div>
+                        <div class="text-center">
+                            <input type="checkbox" id="day-sun" class="form-checkbox">
+                            <label for="day-sun" class="block text-xs">Dom</label>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <button id="add-recurring-submit" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                        Salva
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Weight Modal -->
+    <div id="add-weight-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Aggiungi Peso</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="weight-value" class="block text-sm font-medium mb-1">Peso (kg):</label>
+                    <input type="number" id="weight-value" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base" min="0" step="0.1">
+                </div>
+                <div>
+                    <label for="weight-date" class="block text-sm font-medium mb-1">Data:</label>
+                    <input type="date" id="weight-date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <label for="weight-note" class="block text-sm font-medium mb-1">Note (opzionale):</label>
+                    <textarea id="weight-note" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base h-24 resize-none"></textarea>
+                </div>
+                <div>
+                    <button id="add-weight-submit" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                        Salva
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Photo Modal -->
+    <div id="add-photo-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Aggiungi Foto</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="photo-file" class="block text-sm font-medium mb-1">Seleziona foto:</label>
+                    <input type="file" id="photo-file" accept="image/*" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <label for="photo-date" class="block text-sm font-medium mb-1">Data:</label>
+                    <input type="date" id="photo-date" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base">
+                </div>
+                <div>
+                    <label for="photo-note" class="block text-sm font-medium mb-1">Note (opzionale):</label>
+                    <textarea id="photo-note" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-base h-24 resize-none"></textarea>
+                </div>
+                <div>
+                    <button id="add-photo-submit" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                        Salva
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TDEE Calculator Modal -->
+    <div id="tdee-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold">Calcolo TDEE</h2>
+                <button class="close-modal text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">1. Calcolo BMR</h3>
+                    <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
+                        <p id="bmr-calculation" class="text-sm">Per calcolare il tuo BMR utilizzeremo la formula di Mifflin-St Jeor.</p>
+                        <p id="bmr-result" class="text-lg font-bold mt-2">BMR: 0 kcal</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">2. Lavoro</h3>
+                    <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
+                        <p id="job-description" class="text-sm">Dettagli lavoro</p>
+                        <p id="job-calculation" class="text-sm mt-2">Calcolo in base alle ore di lavoro e MET.</p>
+                        <p id="job-result" class="text-lg font-bold mt-2">Dispendio da lavoro: 0 kcal/giorno</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">3. Attività Sportiva</h3>
+                    <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
+                        <div id="weekly-activities" class="space-y-2 mb-3">
+                            <p class="text-sm">Nessuna attività sportiva settimanale configurata.</p>
+                        </div>
+                        <p id="exercise-result" class="text-lg font-bold">Dispendio da sport: 0 kcal/giorno</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">4. Passi Giornalieri</h3>
+                    <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
+                        <p id="steps-calculation" class="text-sm">Calcolo basato sui passi medi giornalieri.</p>
+                        <p id="steps-result" class="text-lg font-bold mt-2">Dispendio da passi: 0 kcal/giorno</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">5. Effetto Termico degli Alimenti (TEF)</h3>
+                    <div class="p-4 bg-gray-100 dark:bg-gray-700 rounded-md">
+                        <p class="text-sm">TEF stimato come 10% del dispendio energetico totale.</p>
+                        <p id="tef-result" class="text-lg font-bold mt-2">TEF: 0 kcal/giorno</p>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="text-lg font-semibold mb-3">TDEE Totale</h3>
+                    <div class="p-4 bg-primary bg-opacity-10 rounded-md">
+                        <p id="tdee-calculation" class="text-sm">Somma di tutte le componenti energetiche.</p>
+                        <p id="tdee-calculation-result" class="text-2xl font-bold mt-2 text-primary">TDEE: 0 kcal/giorno</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-between">
+                    <div>
+                        <p class="text-sm font-medium">Obiettivo:</p>
+                        <p id="goal-description" class="text-sm">Perdita di peso</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium">Deficit/Surplus:</p>
+                        <p id="deficit-value" class="text-sm">500 kcal</p>
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium">Calorie giornaliere target:</p>
+                        <p id="calorie-target" class="text-lg font-bold text-primary">0 kcal</p>
+                    </div>
+                </div>
+
+                <div>
+                    <button id="save-tdee-results" class="w-full px-4 py-2 bg-primary text-white rounded-md hover:bg-secondary transition-colors">
+                        Applica Questi Valori
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Database per la simulazione dei dati
+        const DB = {
+            currentUser: null,
+            users: [],
+            foods: [
+                { id: 1, name: "Petto di pollo", calories: 165, protein: 31, carbs: 0, fat: 3.6, custom: false },
+                { id: 2, name: "Riso bianco cotto", calories: 130, protein: 2.7, carbs: 28, fat: 0.3, custom: false },
+                { id: 3, name: "Uovo intero", calories: 155, protein: 13, carbs: 1.1, fat: 11, custom: false },
+                { id: 4, name: "Latte intero", calories: 64, protein: 3.3, carbs: 4.7, fat: 3.6, custom: false },
+                { id: 5, name: "Pane integrale", calories: 247, protein: 13, carbs: 41, fat: 3.4, custom: false },
+                { id: 6, name: "Pasta", calories: 371, protein: 13, carbs: 75, fat: 1.5, custom: false },
+                { id: 7, name: "Mela", calories: 52, protein: 0.3, carbs: 14, fat: 0.2, custom: false },
+                { id: 8, name: "Tonno in scatola al naturale", calories: 130, protein: 29, carbs: 0, fat: 1, custom: false },
+                { id: 9, name: "Olio extravergine d'oliva", calories: 884, protein: 0, carbs: 0, fat: 100, custom: false },
+                { id: 10, name: "Banana", calories: 89, protein: 1.1, carbs: 23, fat: 0.3, custom: false }
+            ],
+            meals: {},
+            activities: {},
+            recurringActivities: [],
+            weights: {},
+            measurements: {},
+            photos: {},
+            settings: {}
+        };
+
+        // Attività MET (Metabolic Equivalent of Task)
+        const metValues = {
+            jobs: {
+                sedentary: 1.2, // Ufficio, guida
+                light: 1.5, // Insegnante, commesso
+                moderate: 2.0, // Cameriere, idraulico
+                heavy: 3.0, // Operaio, muratore
+                veryheavy: 4.0 // Lavori intensi
+            },
+            activities: {
+                running: 9.8,
+                walking: 3.5,
+                cycling: 7.5,
+                swimming: 8.0,
+                weightlifting: 5.0,
+                yoga: 3.0,
+                other: 5.0
+            }
+        };
+
+        // Funzioni di utilità
+        function formatDate(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function getToday() {
+            return formatDate(new Date());
+        }
+
+        function showScreen(screenId) {
+            // Nascondi tutti gli schermi
+            document.querySelectorAll('main > div[id$="-screen"]').forEach(screen => {
+                screen.classList.add('hidden');
+            });
+            
+            // Mostra lo schermo selezionato
+            const screen = document.getElementById(screenId + '-screen');
+            if (screen) {
+                screen.classList.remove('hidden');
+            }
+            
+            // Aggiorna la classe attiva nel menu di navigazione
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('text-primary');
+                if (link.id === 'nav-' + screenId || link.dataset.target === screenId) {
+                    link.classList.add('text-primary');
+                }
+            });
+        }
+
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+        }
+
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+
+        function hideAllModals() {
+            document.querySelectorAll('div[id$="-modal"]').forEach(modal => {
+                modal.classList.add('hidden');
+            });
+        }
+
+        // Funzioni di calcolo
+        function calculateBMR(user) {
+            if (!user) return 0;
+            
+            const { age, gender, height, weight, bodyfat, bmrFormula } = user;
+            
+            if (bmrFormula === 'katch' && bodyfat) {
+                // Formula Katch-McArdle (se BF nota)
+                const lbm = weight * (1 - (bodyfat / 100)); // Lean Body Mass
+                return Math.round(370 + (21.6 * lbm));
+            } else {
+                // Formula Mifflin-St Jeor
+                if (gender === 'male') {
+                    return Math.round((10 * weight) + (6.25 * height) - (5 * age) + 5);
+                } else {
+                    return Math.round((10 * weight) + (6.25 * height) - (5 * age) - 161);
+                }
+            }
+        }
+
+        function calculateWorkEnergyExpenditure(user) {
+            if (!user) return 0;
+            
+            const { weight, jobType, jobHours, jobDays, customJobDescription } = user;
+            
+            // MET value based on job type
+            let met = metValues.jobs[jobType] || 1.2;
+            
+            // For custom job, we would use an AI to estimate MET, but we'll use a default for now
+            if (jobType === 'custom' && customJobDescription) {
+                // Simulate AI interpretation
+                met = 2.0; // Default moderate value
+            }
+            
+            // Average daily hours (considering workdays per week)
+            const avgDailyHours = (jobHours * jobDays) / 7;
+            
+            // Calculate calories burned during work
+            // Calories = MET × weight (kg) × duration (hours) - (BMR × duration/24)
+            const bmr = calculateBMR(user);
+            const workCalories = (met * weight * avgDailyHours) - (bmr * avgDailyHours / 24);
+            
+            return Math.round(workCalories);
+        }
+
+        function calculateActivityCalories(activity, weight) {
+            const { type, distance, duration } = activity;
+            
+            if (type === 'running' && distance) {
+                // Formula per la corsa: kcal = km × peso (kg)
+                return Math.round(distance * weight);
+            } else if (type === 'walking' && distance) {
+                // Formula per la camminata: kcal = km × peso (kg) × 0.5
+                return Math.round(distance * weight * 0.5);
+            } else if (duration) {
+                // For other activities, use MET value
+                const met = metValues.activities[type] || metValues.activities.other;
+                // Convert duration from minutes to hours
+                const durationHours = duration / 60;
+                // Calculate calories
+                return Math.round(met * weight * durationHours);
+            }
+            
+            return 0;
+        }
+
+        function calculateStepCalories(steps, weight) {
+            if (!steps || !weight) return 0;
+            
+            // Stima della distanza: 1 passo ≈ 0.762 metri
+            const distanceKm = (steps * 0.762) / 1000;
+            
+            // Formula per la camminata: kcal = km × peso (kg) × 0.5
+            return Math.round(distanceKm * weight * 0.5);
+        }
+
+        function calculateTDEE(user) {
+            if (!user) return { total: 0, components: {} };
+            
+            const components = {};
+            
+            // 1. BMR
+            components.bmr = calculateBMR(user);
+            
+            // 2. Lavoro
+            components.work = calculateWorkEnergyExpenditure(user);
+            
+            // 3. Attività fisica ricorrente (media settimanale)
+            components.exercise = 0;
+            if (DB.recurringActivities && DB.recurringActivities.length > 0) {
+                DB.recurringActivities.forEach(activity => {
+                    const dailyCalories = calculateActivityCalories(activity, user.weight) * activity.frequency / 7;
+                    components.exercise += dailyCalories;
+                });
+            }
+            components.exercise = Math.round(components.exercise);
+            
+            // 4. Passi
+            components.steps = calculateStepCalories(user.dailySteps || 0, user.weight);
+            
+            // Subtotal before TEF
+            const subtotal = components.bmr + components.work + components.exercise + components.steps;
+            
+            // 5. Effetto termico degli alimenti (10% del totale)
+            components.tef = Math.round(subtotal * 0.1);
+            
+            // Total TDEE
+            const total = subtotal + components.tef;
+            
+            return { total: Math.round(total), components };
+        }
+
+        function calculateTargetCalories(user) {
+            if (!user) return 0;
+            
+            const tdee = calculateTDEE(user).total;
+            const { goal, deficit } = user;
+            
+            if (goal === 'lose') {
+                return tdee - deficit;
+            } else if (goal === 'gain') {
+                return tdee + deficit;
+            } else {
+                return tdee;
+            }
+        }
+
+        // Funzioni di rendering
+        function renderFoodLibrary() {
+            const container = document.getElementById('food-library');
+            container.innerHTML = '';
+            
+            if (DB.foods.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Nessun alimento nella libreria</p>';
+                return;
+            }
+            
+            const searchInput = document.getElementById('food-search').value.toLowerCase();
+            const filteredFoods = searchInput ? 
+                DB.foods.filter(food => food.name.toLowerCase().includes(searchInput)) : 
+                DB.foods;
+            
+            if (filteredFoods.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Nessun risultato trovato</p>';
+                return;
+            }
+            
+            const foodItems = document.createElement('div');
+            foodItems.className = 'space-y-2';
+            
+            filteredFoods.forEach(food => {
+                const foodItem = document.createElement('div');
+                foodItem.className = 'p-3 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors';
+                
+                const foodHeader = document.createElement('div');
+                foodHeader.className = 'flex justify-between items-center';
+                
+                const foodName = document.createElement('h3');
+                foodName.className = 'font-medium';
+                foodName.textContent = food.name + (food.custom ? ' (personalizzato)' : '');
+                
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'flex space-x-2';
+                
+                const addButton = document.createElement('button');
+                addButton.className = 'px-2 py-1 text-xs bg-primary text-white rounded hover:bg-secondary transition-colors';
+                addButton.textContent = 'Aggiungi';
+                addButton.onclick = () => {
+                    // Imposta il cibo selezionato e mostra le opzioni per aggiungerlo
+                    selectFood(food);
+                    showModal('add-food-modal');
+                };
+                
+                const editButton = document.createElement('button');
+                editButton.className = 'px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors';
+                editButton.textContent = 'Modifica';
+                editButton.onclick = () => {
+                    // Prepara il form di modifica
+                    document.getElementById('custom-food-name').value = food.name;
+                    document.getElementById('custom-food-calories').value = food.calories;
+                    document.getElementById('custom-food-protein').value = food.protein;
+                    document.getElementById('custom-food-carbs').value = food.carbs;
+                    document.getElementById('custom-food-fat').value = food.fat;
+                    
+                    // Salva l'ID del cibo per l'aggiornamento
+                    document.getElementById('save-custom-food').dataset.editId = food.id;
+                    
+                    showModal('create-food-modal');
+                };
+                
+                buttonsContainer.appendChild(addButton);
+                if (food.custom) {
+                    buttonsContainer.appendChild(editButton);
+                }
+                
+                foodHeader.appendChild(foodName);
+                foodHeader.appendChild(buttonsContainer);
+                
+                const foodDetails = document.createElement('div');
+                foodDetails.className = 'text-sm text-gray-600 dark:text-gray-400 mt-1 grid grid-cols-4 gap-2';
+                
+                const calories = document.createElement('div');
+                calories.textContent = `${food.calories} kcal`;
+                
+                const protein = document.createElement('div');
+                protein.textContent = `P: ${food.protein}g`;
+                
+                const carbs = document.createElement('div');
+                carbs.textContent = `C: ${food.carbs}g`;
+                
+                const fat = document.createElement('div');
+                fat.textContent = `G: ${food.fat}g`;
+                
+                foodDetails.appendChild(calories);
+                foodDetails.appendChild(protein);
+                foodDetails.appendChild(carbs);
+                foodDetails.appendChild(fat);
+                
+                foodItem.appendChild(foodHeader);
+                foodItem.appendChild(foodDetails);
+                
+                foodItems.appendChild(foodItem);
+            });
+            
+            container.appendChild(foodItems);
+        }
+
+        function renderFoodSearchResults(query) {
+            const resultsContainer = document.getElementById('food-search-results');
+            resultsContainer.innerHTML = '';
+            
+            if (!query || query.length < 2) {
+                resultsContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Cerca un alimento</p>';
+                return;
+            }
+            
+            const filteredFoods = DB.foods.filter(food => 
+                food.name.toLowerCase().includes(query.toLowerCase())
+            );
+            
+            if (filteredFoods.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Nessun risultato trovato</p>';
+                return;
+            }
+            
+            filteredFoods.forEach(food => {
+                const foodItem = document.createElement('div');
+                foodItem.className = 'p-2 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer';
+                foodItem.onclick = () => selectFood(food);
+                
+                const foodName = document.createElement('div');
+                foodName.className = 'font-medium';
+                foodName.textContent = food.name + (food.custom ? ' (personalizzato)' : '');
+                
+                const foodDetails = document.createElement('div');
+                foodDetails.className = 'text-xs text-gray-600 dark:text-gray-400';
+                foodDetails.textContent = `${food.calories} kcal | P: ${food.protein}g | C: ${food.carbs}g | G: ${food.fat}g`;
+                
+                foodItem.appendChild(foodName);
+                foodItem.appendChild(foodDetails);
+                
+                resultsContainer.appendChild(foodItem);
+            });
+        }
+
+        function selectFood(food) {
+            const selectedFoodInfo = document.getElementById('selected-food-info');
+            selectedFoodInfo.classList.remove('hidden');
+            
+            document.getElementById('selected-food-name').textContent = food.name;
+            document.getElementById('selected-food-calories').textContent = `${food.calories} kcal per 100g | P: ${food.protein}g | C: ${food.carbs}g | G: ${food.fat}g`;
+            
+            // Salva l'ID del cibo per l'aggiunta
+            document.getElementById('add-food-submit').dataset.foodId = food.id;
+        }
+
+        function renderMeals(date) {
+            const meals = DB.meals[date] || {};
+            
+            // Resetta i contenitori
+            document.querySelectorAll('.food-items').forEach(container => {
+                const mealType = container.classList[0].split('-')[0]; // breakfast-items -> breakfast
+                container.innerHTML = '';
+                
+                if (!meals[mealType] || meals[mealType].length === 0) {
+                    container.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Nessun alimento registrato</p>';
+                }
+            });
+            
+            // Totali per pasto
+            const mealTotals = {
+                breakfast: 0,
+                lunch: 0,
+                dinner: 0,
+                snacks: 0
+            };
+            
+            // Totali macronutrienti
+            let totalCalories = 0;
+            let totalProtein = 0;
+            let totalCarbs = 0;
+            let totalFat = 0;
+            
+            // Renderizza i pasti per ogni tipo
+            Object.keys(meals).forEach(mealType => {
+                const container = document.querySelector(`.${mealType}-items`);
+                container.innerHTML = '';
+                
+                meals[mealType].forEach((meal, index) => {
+                    const food = DB.foods.find(f => f.id === meal.foodId);
+                    if (!food) return;
+                    
+                    // Calcola valori in base alla quantità
+                    const ratio = meal.quantity / 100;
+                    const calories = Math.round(food.calories * ratio);
+                    const protein = (food.protein * ratio).toFixed(1);
+                    const carbs = (food.carbs * ratio).toFixed(1);
+                    const fat = (food.fat * ratio).toFixed(1);
+                    
+                    // Aggiorna totali
+                    mealTotals[mealType] += calories;
+                    totalCalories += calories;
+                    totalProtein += parseFloat(protein);
+                    totalCarbs += parseFloat(carbs);
+                    totalFat += parseFloat(fat);
+                    
+                    const foodItem = document.createElement('div');
+                    foodItem.className = 'flex justify-between items-center p-2 border border-gray-200 dark:border-gray-700 rounded-md';
+                    
+                    const foodInfo = document.createElement('div');
+                    foodInfo.innerHTML = `
+                        <div class="font-medium">${food.name}</div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400">${meal.quantity}g | ${calories} kcal</div>
+                    `;
+                    
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.className = 'text-red-500 hover:text-red-700';
+                    deleteBtn.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        </svg>
+                    `;
+                    deleteBtn.onclick = () => {
+                        meals[mealType].splice(index, 1);
+                        if (meals[mealType].length === 0) {
+                            delete meals[mealType];
+                        }
+                        renderMeals(date);
+                        updateDashboard();
+                    };
+                    
+                    foodItem.appendChild(foodInfo);
+                    foodItem.appendChild(deleteBtn);
+                    
+                    container.appendChild(foodItem);
+                });
+                
+                // Aggiorna totale del pasto
+                document.querySelector(`.meal-total[data-meal="${mealType}"]`).textContent = `${mealTotals[mealType]} kcal`;
+            });
+            
+            // Aggiorna totale giornaliero
+            document.getElementById('daily-total').textContent = `${totalCalories} kcal`;
+            
+            // Aggiorna i macronutrienti nella dashboard
+            document.getElementById('protein-value').textContent = `${totalProtein.toFixed(1)}g`;
+            document.getElementById('carbs-value').textContent = `${totalCarbs.toFixed(1)}g`;
+            document.getElementById('fat-value').textContent = `${totalFat.toFixed(1)}g`;
+            
+            // Calcola percentuali per le barre dei macro
+            const proteinCals = totalProtein * 4;
+            const carbsCals = totalCarbs * 4;
+            const fatCals = totalFat * 9;
+            const totalMacroCals = proteinCals + carbsCals + fatCals;
+            
+            if (totalMacroCals > 0) {
+                const proteinPercentage = (proteinCals / totalMacroCals) * 100;
+                const carbsPercentage = (carbsCals / totalMacroCals) * 100;
+                const fatPercentage = (fatCals / totalMacroCals) * 100;
+                
+                document.getElementById('protein-bar').style.width = `${proteinPercentage}%`;
+                document.getElementById('carbs-bar').style.width = `${carbsPercentage}%`;
+                document.getElementById('fat-bar').style.width = `${fatPercentage}%`;
+                
+                // Posiziona le barre correttamente
+                document.getElementById('carbs-bar').style.left = `${proteinPercentage}%`;
+                document.getElementById('fat-bar').style.left = `${proteinPercentage + carbsPercentage}%`;
+            } else {
+                document.getElementById('protein-bar').style.width = '0%';
+                document.getElementById('carbs-bar').style.width = '0%';
+                document.getElementById('fat-bar').style.width = '0%';
+                document.getElementById('carbs-bar').style.left = '0%';
+                document.getElementById('fat-bar').style.left = '0%';
+            }
+        }
+
+        function renderTodayMeals() {
+            const today = getToday();
+            const meals = DB.meals[today] || {};
+            const container = document.getElementById('today-meals');
+            container.innerHTML = '';
+            
+            if (Object.keys(meals).length === 0) {
+                container.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Nessun pasto registrato oggi</p>';
+                return;
+            }
+            
+            Object.keys(meals).forEach(mealType => {
+                if (!meals[mealType] || meals[mealType].length === 0) return;
+                
+                const mealNames = {
+                    breakfast: 'Colazione',
+                    lunch: 'Pranzo',
+                    dinner: 'Cena',
+                    snacks: 'Spuntini'
+                };
+                
+                const mealContainer = document.createElement('div');
+                mealContainer.className = 'border-b border-gray-200 dark:border-gray-700 pb-2 mb-2 last:border-0 last:mb-0 last:pb-0';
+                
+                const mealHeader = document.createElement('div');
+                mealHeader.className = 'flex justify-between items-center mb-1';
+                
+                const mealTitle = document.createElement('h3');
+                mealTitle.className = 'font-medium';
+                mealTitle.textContent = mealNames[mealType];
+                
+                const mealCalories = document.createElement('span');
+                mealCalories.className = 'text-sm';
+                
+                let totalCalories = 0;
+                
+                const foodList = document.createElement('ul');
+                foodList.className = 'text-sm space-y-1';
+                
+                meals[mealType].forEach(meal => {
+                    const food = DB.foods.find(f => f.id === meal.foodId);
+                    if (!food) return;
+                    
+                    const ratio = meal.quantity / 100;
+                    const calories = Math.round(food.calories * ratio);
+                    totalCalories += calories;
+                    
+                    const foodItem = document.createElement('li');
+                    foodItem.className = 'flex justify-between';
+                    foodItem.innerHTML = `
+                        <span>${food.name} (${meal.quantity}g)</span>
+                        <span>${calories} kcal</span>
+                    `;
+                    
+                    foodList.appendChild(foodItem);
+                });
+                
+                mealCalories.textContent = `${totalCalories} kcal`;
+                
+                mealHeader.appendChild(mealTitle);
+                mealHeader.appendChild(mealCalories);
+                
+                mealContainer.appendChild(mealHeader);
+                mealContainer.appendChild(foodList);
+                
+                container.appendChild(mealContainer);
+            });
+        }
+
+        function renderActivities(date) {
+            const activitiesContainer = document.getElementById('activities-container');
+            activitiesContainer.innerHTML = '';
+            
+            const dailyActivities = DB.activities[date] || [];
+            
+            if (dailyActivities.length === 0) {
+                activitiesContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Nessuna attività registrata</p>';
+                return;
+            }
+            
+            const activityNames = {
+                running: 'Corsa',
+                walking: 'Camminata',
+                cycling: 'Ciclismo',
+                swimming: 'Nuoto',
+                weightlifting: 'Sollevamento pesi',
+                yoga: 'Yoga',
+                other: 'Altro'
+            };
+            
+            dailyActivities.forEach((activity, index) => {
+                const activityItem = document.createElement('div');
+                activityItem.className = 'p-3 border border-gray-200 dark:border-gray-700 rounded-md';
+                
+                const activityHeader = document.createElement('div');
+                activityHeader.className = 'flex justify-between items-center mb-2';
+                
+                const activityTitle = document.createElement('h3');
+                activityTitle.className = 'font-semibold';
+                activityTitle.textContent = activityNames[activity.type] || 'Attività';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'text-red-500 hover:text-red-700';
+                deleteBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                `;
+                deleteBtn.onclick = () => {
+                    dailyActivities.splice(index, 1);
+                    renderActivities(date);
+                    updateDashboard();
+                };
+                
+                activityHeader.appendChild(activityTitle);
+                activityHeader.appendChild(deleteBtn);
+                
+                const activityDetails = document.createElement('div');
+                activityDetails.className = 'grid grid-cols-2 text-sm gap-1';
+                
+                if (activity.distance) {
+                    activityDetails.innerHTML += `<div>Distanza: ${activity.distance} km</div>`;
+                }
+                
+                if (activity.duration) {
+                    activityDetails.innerHTML += `<div>Durata: ${activity.duration} min</div>`;
+                }
+                
+                // Calcola calorie bruciate
+                if (DB.currentUser) {
+                    const calories = calculateActivityCalories(activity, DB.currentUser.weight);
+                    activityDetails.innerHTML += `<div class="col-span-2 font-medium mt-1">Calorie bruciate: ${calories} kcal</div>`;
+                }
+                
+                activityItem.appendChild(activityHeader);
+                activityItem.appendChild(activityDetails);
+                
+                activitiesContainer.appendChild(activityItem);
+            });
+        }
+
+        function renderTodayActivities() {
+            const today = getToday();
+            const activities = DB.activities[today] || [];
+            const container = document.getElementById('today-activities');
+            container.innerHTML = '';
+            
+            if (activities.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Nessuna attività registrata oggi</p>';
+                return;
+            }
+            
+            const activityNames = {
+                running: 'Corsa',
+                walking: 'Camminata',
+                cycling: 'Ciclismo',
+                swimming: 'Nuoto',
+                weightlifting: 'Sollevamento pesi',
+                yoga: 'Yoga',
+                other: 'Altro'
+            };
+            
+            activities.forEach(activity => {
+                const activityItem = document.createElement('div');
+                activityItem.className = 'flex justify-between items-center p-2 border-b border-gray-200 dark:border-gray-700 last:border-0';
+                
+                const activityInfo = document.createElement('div');
+                
+                const activityTitle = document.createElement('div');
+                activityTitle.className = 'font-medium';
+                activityTitle.textContent = activityNames[activity.type] || 'Attività';
+                
+                const activityDetails = document.createElement('div');
+                activityDetails.className = 'text-xs text-gray-600 dark:text-gray-400';
+                
+                let details = [];
+                if (activity.distance) details.push(`${activity.distance} km`);
+                if (activity.duration) details.push(`${activity.duration} min`);
+                
+                activityDetails.textContent = details.join(' | ');
+                
+                activityInfo.appendChild(activityTitle);
+                activityInfo.appendChild(activityDetails);
+                
+                const calories = document.createElement('div');
+                calories.className = 'text-sm font-medium';
+                
+                if (DB.currentUser) {
+                    const cals = calculateActivityCalories(activity, DB.currentUser.weight);
+                    calories.textContent = `${cals} kcal`;
+                }
+                
+                activityItem.appendChild(activityInfo);
+                activityItem.appendChild(calories);
+                
+                container.appendChild(activityItem);
+            });
+        }
+
+        function renderRecurringActivities() {
+            const container = document.getElementById('recurring-activities');
+            container.innerHTML = '';
+            
+            if (!DB.recurringActivities || DB.recurringActivities.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Nessuna attività ricorrente configurata</p>';
+                return;
+            }
+            
+            const activityNames = {
+                running: 'Corsa',
+                walking: 'Camminata',
+                cycling: 'Ciclismo',
+                swimming: 'Nuoto',
+                weightlifting: 'Sollevamento pesi',
+                yoga: 'Yoga',
+                other: 'Altro'
+            };
+            
+            DB.recurringActivities.forEach((activity, index) => {
+                const activityItem = document.createElement('div');
+                activityItem.className = 'p-3 border border-gray-200 dark:border-gray-700 rounded-md';
+                
+                const activityHeader = document.createElement('div');
+                activityHeader.className = 'flex justify-between items-center mb-2';
+                
+                const activityTitle = document.createElement('h3');
+                activityTitle.className = 'font-semibold';
+                activityTitle.textContent = activityNames[activity.type] || 'Attività';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'text-red-500 hover:text-red-700';
+                deleteBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                `;
+                deleteBtn.onclick = () => {
+                    DB.recurringActivities.splice(index, 1);
+                    renderRecurringActivities();
+                    updateDashboard();
+                };
+                
+                activityHeader.appendChild(activityTitle);
+                activityHeader.appendChild(deleteBtn);
+                
+                const activityDetails = document.createElement('div');
+                activityDetails.className = 'text-sm';
+                
+                let details = [];
+                if (activity.distance) details.push(`${activity.distance} km`);
+                if (activity.duration) details.push(`${activity.duration} min`);
+                
+                activityDetails.innerHTML = `
+                    <div>${details.join(' | ')}</div>
+                    <div class="mt-1">Frequenza: ${activity.frequency} volte a settimana</div>
+                `;
+                
+                // Giorni della settimana
+                if (activity.days && activity.days.length > 0) {
+                    const daysNames = {
+                        mon: 'Lun',
+                        tue: 'Mar',
+                        wed: 'Mer',
+                        thu: 'Gio',
+                        fri: 'Ven',
+                        sat: 'Sab',
+                        sun: 'Dom'
+                    };
+                    
+                    const daysStr = activity.days.map(day => daysNames[day]).join(', ');
+                    activityDetails.innerHTML += `<div class="text-xs text-gray-600 dark:text-gray-400 mt-1">Giorni: ${daysStr}</div>`;
+                }
+                
+                // Calcola calorie settimanali
+                if (DB.currentUser) {
+                    const caloriesPerSession = calculateActivityCalories(activity, DB.currentUser.weight);
+                    const weeklyCalories = caloriesPerSession * activity.frequency;
+                    const dailyAverage = Math.round(weeklyCalories / 7);
+                    
+                    activityDetails.innerHTML += `
+                        <div class="font-medium mt-2">
+                            <div>${caloriesPerSession} kcal per sessione</div>
+                            <div>${weeklyCalories} kcal a settimana</div>
+                            <div>${dailyAverage} kcal al giorno (media)</div>
+                        </div>
+                    `;
+                }
+                
+                activityItem.appendChild(activityHeader);
+                activityItem.appendChild(activityDetails);
+                
+                container.appendChild(activityItem);
+            });
+            
+            // Aggiorna anche la sezione di calcolo TDEE
+            updateTDEECalculation();
+        }
+
+        function renderWeightChart() {
+            const canvas = document.getElementById('weight-chart');
+            const ctx = canvas.getContext('2d');
+            
+            // Elimina il grafico precedente se esiste
+            if (window.weightChart) {
+                window.weightChart.destroy();
+            }
+            
+            // Prepara i dati
+            const weightEntries = [];
+            for (const date in DB.weights) {
+                weightEntries.push({
+                    date,
+                    weight: DB.weights[date].weight
+                });
+            }
+            
+            // Ordina per data
+            weightEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            if (weightEntries.length === 0) {
+                // Non ci sono dati, mostra un messaggio
+                if (!window.weightChart) {
+                    window.weightChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Nessun dato'],
+                            datasets: [{
+                                label: 'Peso (kg)',
+                                data: [],
+                                borderColor: '#5D5CDE',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false
+                                }
+                            }
+                        }
+                    });
+                }
+                return;
+            }
+            
+            // Estrai date e pesi
+            const dates = weightEntries.map(entry => {
+                const date = new Date(entry.date);
+                return date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+            });
+            const weights = weightEntries.map(entry => entry.weight);
+            
+            // Aggiorna le statistiche
+            if (weightEntries.length > 0) {
+                document.getElementById('initial-weight').textContent = weightEntries[0].weight;
+                document.getElementById('current-weight').textContent = weightEntries[weightEntries.length - 1].weight;
+                const difference = weightEntries[weightEntries.length - 1].weight - weightEntries[0].weight;
+                document.getElementById('weight-difference').textContent = difference.toFixed(1);
+                if (difference < 0) {
+                    document.getElementById('weight-difference').classList.add('text-green-600');
+                    document.getElementById('weight-difference').classList.remove('text-red-600');
+                } else if (difference > 0) {
+                    document.getElementById('weight-difference').classList.add('text-red-600');
+                    document.getElementById('weight-difference').classList.remove('text-green-600');
+                } else {
+                    document.getElementById('weight-difference').classList.remove('text-green-600', 'text-red-600');
+                }
+            }
+            
+            // Crea il grafico
+            window.weightChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Peso (kg)',
+                        data: weights,
+                        borderColor: '#5D5CDE',
+                        backgroundColor: 'rgba(93, 92, 222, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + ' kg';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderMeasurementsChart() {
+            const canvas = document.getElementById('measurements-chart');
+            const ctx = canvas.getContext('2d');
+            
+            // Elimina il grafico precedente se esiste
+            if (window.measurementsChart) {
+                window.measurementsChart.destroy();
+            }
+            
+            // Prepara i dati per tipo di misurazione selezionata
+            const selectedType = document.getElementById('measurement-type').value;
+            
+            const measurementEntries = [];
+            for (const date in DB.measurements) {
+                const typeMeasurements = DB.measurements[date];
+                if (typeMeasurements[selectedType]) {
+                    measurementEntries.push({
+                        date,
+                        value: typeMeasurements[selectedType]
+                    });
+                }
+            }
+            
+            // Ordina per data
+            measurementEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            if (measurementEntries.length === 0) {
+                // Non ci sono dati, mostra un grafico vuoto
+                if (!window.measurementsChart) {
+                    window.measurementsChart = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: ['Nessun dato'],
+                            datasets: [{
+                                label: 'Misura (cm)',
+                                data: [],
+                                borderColor: '#5D5CDE',
+                                tension: 0.1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: false
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: false
+                                }
+                            }
+                        }
+                    });
+                }
+                return;
+            }
+            
+            // Estrai date e valori
+            const dates = measurementEntries.map(entry => {
+                const date = new Date(entry.date);
+                return date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
+            });
+            const values = measurementEntries.map(entry => entry.value);
+            
+            // Titoli delle misurazioni
+            const measurementTitles = {
+                chest: 'Torace',
+                waist: 'Vita',
+                hips: 'Fianchi',
+                thigh: 'Coscia',
+                arm: 'Braccio'
+            };
+            
+            // Crea il grafico
+            window.measurementsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: measurementTitles[selectedType] + ' (cm)',
+                        data: values,
+                        borderColor: '#5D5CDE',
+                        backgroundColor: 'rgba(93, 92, 222, 0.1)',
+                        tension: 0.1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + ' cm';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCaloriesChart() {
+            const canvas = document.getElementById('calories-chart');
+            const ctx = canvas.getContext('2d');
+            
+            // Elimina il grafico precedente se esiste
+            if (window.caloriesChart) {
+                window.caloriesChart.destroy();
+            }
+            
+            // Timeframe selezionato
+            const timeframe = document.getElementById('chart-timeframe').value;
+            
+            // Calcola data di inizio
+            const today = new Date();
+            let startDate;
+            
+            if (timeframe === 'week') {
+                startDate = new Date(today);
+                startDate.setDate(today.getDate() - 6);
+            } else { // month
+                startDate = new Date(today);
+                startDate.setDate(today.getDate() - 29);
+            }
+            
+            // Prepara array di date
+            const dates = [];
+            for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
+                dates.push(new Date(d));
+            }
+            
+            // Preparazione dati
+            const targetCalories = DB.currentUser ? calculateTargetCalories(DB.currentUser) : 2000;
+            const consumedCalories = [];
+            const dateLabels = [];
+            
+            // Per ogni data calcola le calorie consumate
+            dates.forEach(date => {
+                const dateStr = formatDate(date);
+                dateLabels.push(date.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' }));
+                
+                // Calcola calorie consumate
+                let dailyCalories = 0;
+                if (DB.meals[dateStr]) {
+                    const meals = DB.meals[dateStr];
+                    Object.keys(meals).forEach(mealType => {
+                        meals[mealType].forEach(meal => {
+                            const food = DB.foods.find(f => f.id === meal.foodId);
+                            if (food) {
+                                const ratio = meal.quantity / 100;
+                                dailyCalories += Math.round(food.calories * ratio);
+                            }
+                        });
+                    });
+                }
+                
+                consumedCalories.push(dailyCalories);
+            });
+            
+            // Target array
+            const targetArray = new Array(dates.length).fill(targetCalories);
+            
+            // Crea il grafico
+            window.caloriesChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dateLabels,
+                    datasets: [
+                        {
+                            label: 'Calorie Consumate',
+                            data: consumedCalories,
+                            borderColor: '#5D5CDE',
+                            backgroundColor: 'rgba(93, 92, 222, 0.1)',
+                            tension: 0.1,
+                            fill: true
+                        },
+                        {
+                            label: 'Obiettivo',
+                            data: targetArray,
+                            borderColor: '#10B981',
+                            borderDash: [5, 5],
+                            borderWidth: 2,
+                            tension: 0,
+                            fill: false,
+                            pointRadius: 0
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + ' kcal';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderActivityChart() {
+            const canvas = document.getElementById('activity-chart');
+            const ctx = canvas.getContext('2d');
+            
+            // Elimina il grafico precedente se esiste
+            if (window.activityChart) {
+                window.activityChart.destroy();
+            }
+            
+            // Conteggio calorie per tipo di attività
+            const activityCalories = {
+                running: 0,
+                walking: 0,
+                cycling: 0,
+                swimming: 0,
+                weightlifting: 0,
+                yoga: 0,
+                other: 0
+            };
+            
+            if (DB.currentUser) {
+                // Somma calorie dalle attività registrate
+                for (const date in DB.activities) {
+                    const activities = DB.activities[date];
+                    activities.forEach(activity => {
+                        const calories = calculateActivityCalories(activity, DB.currentUser.weight);
+                        activityCalories[activity.type] += calories;
+                    });
+                }
+                
+                // Aggiungi calorie dalle attività ricorrenti (stima settimanale)
+                if (DB.recurringActivities) {
+                    DB.recurringActivities.forEach(activity => {
+                        const caloriesPerSession = calculateActivityCalories(activity, DB.currentUser.weight);
+                        const weeklyCalories = caloriesPerSession * activity.frequency;
+                        activityCalories[activity.type] += weeklyCalories;
+                    });
+                }
+            }
+            
+            // Nomi per il grafico
+            const activityNames = {
+                running: 'Corsa',
+                walking: 'Camminata',
+                cycling: 'Ciclismo',
+                swimming: 'Nuoto',
+                weightlifting: 'Pesi',
+                yoga: 'Yoga',
+                other: 'Altro'
+            };
+            
+            // Filtra solo attività con calorie > 0
+            const labels = [];
+            const data = [];
+            const backgroundColors = [
+                'rgba(93, 92, 222, 0.7)', // primary
+                'rgba(16, 185, 129, 0.7)', // green
+                'rgba(245, 158, 11, 0.7)', // yellow
+                'rgba(239, 68, 68, 0.7)', // red
+                'rgba(139, 92, 246, 0.7)', // purple
+                'rgba(59, 130, 246, 0.7)', // blue
+                'rgba(156, 163, 175, 0.7)' // gray
+            ];
+            
+            let i = 0;
+            for (const type in activityCalories) {
+                if (activityCalories[type] > 0) {
+                    labels.push(activityNames[type]);
+                    data.push(activityCalories[type]);
+                    i++;
+                }
+            }
+            
+            // Se non ci sono dati
+            if (data.length === 0) {
+                labels.push('Nessun dato');
+                data.push(0);
+            }
+            
+            // Crea il grafico
+            window.activityChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: backgroundColors.slice(0, data.length)
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const value = context.raw;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${value} kcal (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTDEECalculation() {
+            if (!DB.currentUser) return;
+            
+            // Calcola il TDEE
+            const tdeeData = calculateTDEE(DB.currentUser);
+            
+            // Aggiorna i valori nel modale di calcolo
+            document.getElementById('bmr-result').textContent = `BMR: ${tdeeData.components.bmr} kcal`;
+            document.getElementById('job-result').textContent = `Dispendio da lavoro: ${tdeeData.components.work} kcal/giorno`;
+            document.getElementById('exercise-result').textContent = `Dispendio da sport: ${tdeeData.components.exercise} kcal/giorno`;
+            document.getElementById('steps-result').textContent = `Dispendio da passi: ${tdeeData.components.steps} kcal/giorno`;
+            document.getElementById('tef-result').textContent = `TEF: ${tdeeData.components.tef} kcal/giorno`;
+            document.getElementById('tdee-calculation-result').textContent = `TDEE: ${tdeeData.total} kcal/giorno`;
+            
+            // Aggiorna descrizione BMR
+            if (DB.currentUser.bmrFormula === 'katch' && DB.currentUser.bodyfat) {
+                document.getElementById('bmr-calculation').textContent = `BMR calcolato con la formula di Katch-McArdle utilizzando il tuo peso (${DB.currentUser.weight} kg) e la percentuale di grasso corporeo (${DB.currentUser.bodyfat}%).`;
+            } else {
+                document.getElementById('bmr-calculation').textContent = `BMR calcolato con la formula di Mifflin-St Jeor utilizzando età (${DB.currentUser.age}), sesso, altezza (${DB.currentUser.height} cm) e peso (${DB.currentUser.weight} kg).`;
+            }
+            
+            // Aggiorna descrizione lavoro
+            const jobTypes = {
+                sedentary: 'Sedentario (ufficio, guida)',
+                light: 'Leggero (insegnante, commesso)',
+                moderate: 'Moderato (cameriere, idraulico)',
+                heavy: 'Pesante (operaio, muratore)',
+                veryheavy: 'Molto pesante (lavori intensi)',
+                custom: 'Personalizzato'
+            };
+            
+            document.getElementById('job-description').textContent = `Tipo di lavoro: ${jobTypes[DB.currentUser.jobType]} per ${DB.currentUser.jobHours} ore al giorno, ${DB.currentUser.jobDays} giorni a settimana.`;
+            document.getElementById('job-calculation').textContent = `Calcolo basato sul MET del lavoro e sulle ore medie giornaliere (${(DB.currentUser.jobHours * DB.currentUser.jobDays / 7).toFixed(1)} ore/giorno).`;
+            
+            // Aggiorna descrizione passi
+            document.getElementById('steps-calculation').textContent = `Calcolo basato su ${DB.currentUser.dailySteps || 0} passi medi giornalieri (circa ${((DB.currentUser.dailySteps || 0) * 0.762 / 1000).toFixed(1)} km).`;
+            
+            // Aggiorna descrizione attività settimanali
+            const weeklyActivitiesContainer = document.getElementById('weekly-activities');
+            weeklyActivitiesContainer.innerHTML = '';
+            
+            if (!DB.recurringActivities || DB.recurringActivities.length === 0) {
+                weeklyActivitiesContainer.innerHTML = '<p class="text-sm">Nessuna attività sportiva settimanale configurata.</p>';
+            } else {
+                const activityNames = {
+                    running: 'Corsa',
+                    walking: 'Camminata',
+                    cycling: 'Ciclismo',
+                    swimming: 'Nuoto',
+                    weightlifting: 'Sollevamento pesi',
+                    yoga: 'Yoga',
+                    other: 'Altro'
+                };
+                
+                DB.recurringActivities.forEach(activity => {
+                    const activityItem = document.createElement('div');
+                    activityItem.className = 'text-sm';
+                    
+                    let details = [];
+                    if (activity.distance) details.push(`${activity.distance} km`);
+                    if (activity.duration) details.push(`${activity.duration} min`);
+                    
+                    const caloriesPerSession = calculateActivityCalories(activity, DB.currentUser.weight);
+                    const weeklyCalories = caloriesPerSession * activity.frequency;
+                    const dailyAverage = Math.round(weeklyCalories / 7);
+                    
+                    activityItem.innerHTML = `
+                        <div><strong>${activityNames[activity.type]}</strong>: ${details.join(' | ')}, ${activity.frequency}x/settimana</div>
+                        <div class="text-xs text-gray-600 dark:text-gray-400">${caloriesPerSession} kcal × ${activity.frequency} = ${weeklyCalories} kcal/sett = ${dailyAverage} kcal/giorno</div>
+                    `;
+                    
+                    weeklyActivitiesContainer.appendChild(activityItem);
+                });
+            }
+            
+            // Aggiorna descrizione TDEE
+            document.getElementById('tdee-calculation').textContent = `TDEE = BMR (${tdeeData.components.bmr}) + Lavoro (${tdeeData.components.work}) + Attività fisica (${tdeeData.components.exercise}) + Passi (${tdeeData.components.steps}) + TEF (${tdeeData.components.tef})`;
+            
+            // Aggiorna obiettivo e calorie target
+            const goalTexts = {
+                lose: 'Perdita di peso',
+                maintain: 'Mantenimento',
+                gain: 'Aumento di peso'
+            };
+            
+            document.getElementById('goal-description').textContent = goalTexts[DB.currentUser.goal];
+            document.getElementById('deficit-value').textContent = `${DB.currentUser.deficit} kcal`;
+            
+            const targetCalories = calculateTargetCalories(DB.currentUser);
+            document.getElementById('calorie-target').textContent = `${targetCalories} kcal`;
+            
+            // Aggiorna anche i valori nella dashboard
+            document.getElementById('tdee-value').textContent = tdeeData.total;
+            document.getElementById('bmr-component').textContent = `${tdeeData.components.bmr} kcal`;
+            document.getElementById('work-component').textContent = `${tdeeData.components.work} kcal`;
+            document.getElementById('exercise-component').textContent = `${tdeeData.components.exercise} kcal`;
+            document.getElementById('steps-component').textContent = `${tdeeData.components.steps} kcal`;
+            document.getElementById('tef-component').textContent = `${tdeeData.components.tef} kcal`;
+            
+            document.getElementById('target-calories').textContent = targetCalories;
+            
+            // Calcola calorie consumate oggi
+            const today = getToday();
+            let consumedCalories = 0;
+            
+            if (DB.meals[today]) {
+                const meals = DB.meals[today];
+                Object.keys(meals).forEach(mealType => {
+                    meals[mealType].forEach(meal => {
+                        const food = DB.foods.find(f => f.id === meal.foodId);
+                        if (food) {
+                            const ratio = meal.quantity / 100;
+                            consumedCalories += Math.round(food.calories * ratio);
+                        }
+                    });
+                });
+            }
+            
+            document.getElementById('consumed-calories').textContent = consumedCalories;
+            document.getElementById('remaining-calories').textContent = targetCalories - consumedCalories;
+        }
+
+        function updateDashboard() {
+            // Data corrente
+            const today = new Date();
+            document.getElementById('current-date').textContent = today.toLocaleDateString('it-IT', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric'
+            });
+            
+            // Aggiorna TDEE e calorie
+            updateTDEECalculation();
+            
+            // Aggiorna i pasti di oggi
+            renderTodayMeals();
+            
+            // Aggiorna le attività di oggi
+            renderTodayActivities();
+            
+            // Aggiorna il grafico delle calorie
+            renderCaloriesChart();
+            
+            // Aggiorna informazioni sui passi
+            if (DB.currentUser) {
+                document.getElementById('avg-steps').textContent = DB.currentUser.dailySteps || 0;
+                document.getElementById('steps-calories').textContent = calculateStepCalories(DB.currentUser.dailySteps || 0, DB.currentUser.weight);
+                document.getElementById('daily-steps').value = DB.currentUser.dailySteps || '';
+            }
+        }
+
+        function setupFormHandlers() {
+            // Handler per il login
+            document.getElementById('login-submit').addEventListener('click', () => {
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                
+                // Semplice simulazione di login
+                const user = DB.users.find(u => u.email === email && u.password === password);
+                
+                if (user) {
+                    DB.currentUser = user;
+                    hideModal('login-modal');
+                    
+                    // Aggiorna l'interfaccia
+                    document.getElementById('login-btn').classList.add('hidden');
+                    document.getElementById('user-info').classList.remove('hidden');
+                    document.getElementById('user-info').classList.add('flex');
+                    document.getElementById('username-display').textContent = user.name;
+                    
+                    // Mostra la dashboard
+                    showScreen('dashboard');
+                    
+                    // Aggiorna la dashboard
+                    updateDashboard();
+                } else {
+                    alert('Email o password non validi.');
+                }
+            });
+            
+            // Handler per la registrazione
+            document.getElementById('register-submit').addEventListener('click', () => {
+                const name = document.getElementById('register-name').value;
+                const email = document.getElementById('register-email').value;
+                const password = document.getElementById('register-password').value;
+                const confirm = document.getElementById('register-confirm').value;
+                
+                if (!name || !email || !password) {
+                    alert('Tutti i campi sono obbligatori.');
+                    return;
+                }
+                
+                if (password !== confirm) {
+                    alert('Le password non coincidono.');
+                    return;
+                }
+                
+                // Verifica se l'email è già in uso
+                if (DB.users.some(u => u.email === email)) {
+                    alert('Email già in uso.');
+                    return;
+                }
+                
+                // Crea un nuovo utente
+                const newUser = {
+                    id: DB.users.length + 1,
+                    name,
+                    email,
+                    password,
+                    age: 30,
+                    gender: 'male',
+                    height: 175,
+                    weight: 75,
+                    bodyfat: null,
+                    goal: 'lose',
+                    deficit: 500,
+                    bmrFormula: 'mifflin',
+                    jobType: 'sedentary',
+                    jobHours: 8,
+                    jobDays: 5,
+                    customJobDescription: '',
+                    dailySteps: 5000
+                };
+                
+                // Aggiungi l'utente al database
+                DB.users.push(newUser);
+                DB.currentUser = newUser;
+                
+                hideModal('register-modal');
+                
+                // Aggiorna l'interfaccia
+                document.getElementById('login-btn').classList.add('hidden');
+                document.getElementById('user-info').classList.remove('hidden');
+                document.getElementById('user-info').classList.add('flex');
+                document.getElementById('username-display').textContent = newUser.name;
+                
+                // Mostra le impostazioni per completare il profilo
+                showScreen('settings');
+                
+                // Popola i campi delle impostazioni
+                document.getElementById('user-age').value = newUser.age;
+                document.getElementById('user-gender').value = newUser.gender;
+                document.getElementById('user-height').value = newUser.height;
+                document.getElementById('user-weight').value = newUser.weight;
+                document.getElementById('user-bodyfat').value = newUser.bodyfat || '';
+                document.getElementById('user-goal').value = newUser.goal;
+                document.getElementById('user-deficit').value = newUser.deficit;
+                document.getElementById('bmr-formula').value = newUser.bmrFormula;
+                document.getElementById('job-type').value = newUser.jobType;
+                document.getElementById('job-hours').value = newUser.jobHours;
+                document.getElementById('job-days').value = newUser.jobDays;
+                
+                alert('Registrazione completata! Ora puoi completare il tuo profilo.');
+            });
+            
+            // Handler per il logout
+            document.getElementById('logout-btn').addEventListener('click', () => {
+                DB.currentUser = null;
+                
+                // Aggiorna l'interfaccia
+                document.getElementById('login-btn').classList.remove('hidden');
+                document.getElementById('user-info').classList.add('hidden');
+                document.getElementById('user-info').classList.remove('flex');
+                
+                // Mostra la schermata di benvenuto
+                showScreen('welcome');
+            });
+            
+            // Handler per il salvataggio dei dati personali
+            document.getElementById('save-personal').addEventListener('click', () => {
+                if (!DB.currentUser) return;
+                
+                const age = parseInt(document.getElementById('user-age').value);
+                const gender = document.getElementById('user-gender').value;
+                const height = parseFloat(document.getElementById('user-height').value);
+                const weight = parseFloat(document.getElementById('user-weight').value);
+                const bodyfat = document.getElementById('user-bodyfat').value ? parseFloat(document.getElementById('user-bodyfat').value) : null;
+                const goal = document.getElementById('user-goal').value;
+                const deficit = parseInt(document.getElementById('user-deficit').value);
+                
+                if (isNaN(age) || isNaN(height) || isNaN(weight) || (bodyfat !== null && isNaN(bodyfat))) {
+                    alert('Inserisci valori numerici validi.');
+                    return;
+                }
+                
+                // Aggiorna i dati dell'utente
+                DB.currentUser.age = age;
+                DB.currentUser.gender = gender;
+                DB.currentUser.height = height;
+                DB.currentUser.weight = weight;
+                DB.currentUser.bodyfat = bodyfat;
+                DB.currentUser.goal = goal;
+                DB.currentUser.deficit = deficit;
+                
+                // Se è il primo peso, aggiungi anche alla cronologia dei pesi
+                if (!Object.keys(DB.weights).length) {
+                    const today = getToday();
+                    DB.weights[today] = {
+                        weight: weight,
+                        note: 'Peso iniziale'
+                    };
+                }
+                
+                // Aggiorna il TDEE e la dashboard
+                updateDashboard();
+                
+                // Torna alla dashboard
+                showScreen('dashboard');
+                
+                alert('Dati personali salvati con successo!');
+            });
+            
+            // Handler per il salvataggio della configurazione TDEE
+            document.getElementById('save-tdee-config').addEventListener('click', () => {
+                if (!DB.currentUser) return;
+                
+                const bmrFormula = document.getElementById('bmr-formula').value;
+                const jobType = document.getElementById('job-type').value;
+                const customJobDescription = jobType === 'custom' ? document.getElementById('custom-job-description').value : '';
+                const jobHours = parseFloat(document.getElementById('job-hours').value);
+                const jobDays = parseInt(document.getElementById('job-days').value);
+                
+                if (isNaN(jobHours) || isNaN(jobDays)) {
+                    alert('Inserisci valori numerici validi.');
+                    return;
+                }
+                
+                // Aggiorna i dati dell'utente
+                DB.currentUser.bmrFormula = bmrFormula;
+                DB.currentUser.jobType = jobType;
+                DB.currentUser.customJobDescription = customJobDescription;
+                DB.currentUser.jobHours = jobHours;
+                DB.currentUser.jobDays = jobDays;
+                
+                // Aggiorna il TDEE e la dashboard
+                updateDashboard();
+                
+                // Torna alla dashboard
+                showScreen('dashboard');
+                
+                alert('Configurazione TDEE salvata con successo!');
+            });
+            
+            // Handler per il salvataggio dell'account
+            document.getElementById('save-account').addEventListener('click', () => {
+                if (!DB.currentUser) return;
+                
+                const email = document.getElementById('user-email').value;
+                const password = document.getElementById('user-password').value;
+                
+                if (!email) {
+                    alert('L\'email è obbligatoria.');
+                    return;
+                }
+                
+                // Verifica se l'email è già in uso da un altro utente
+                const existingUser = DB.users.find(u => u.email === email && u.id !== DB.currentUser.id);
+                if (existingUser) {
+                    alert('Email già in uso da un altro account.');
+                    return;
+                }
+                
+                // Aggiorna i dati dell'utente
+                DB.currentUser.email = email;
+                if (password) {
+                    DB.currentUser.password = password;
+                }
+                
+                alert('Dati account aggiornati con successo!');
+            });
+            
+            // Handler per l'aggiunta di un pasto
+            document.getElementById('add-food-submit').addEventListener('click', () => {
+                const foodId = parseInt(document.getElementById('add-food-submit').dataset.foodId);
+                const quantity = parseInt(document.getElementById('food-quantity').value);
+                const mealType = document.getElementById('food-meal').value;
+                
+                if (isNaN(foodId) || isNaN(quantity) || quantity <= 0) {
+                    alert('Seleziona un alimento e inserisci una quantità valida.');
+                    return;
+                }
+                
+                // Data corrente (o data selezionata nella schermata diario)
+                let currentDate = getToday();
+                if (document.getElementById('food-date').textContent !== 'Oggi') {
+                    currentDate = document.getElementById('food-date').dataset.date;
+                }
+                
+                // Inizializza se necessario
+                if (!DB.meals[currentDate]) {
+                    DB.meals[currentDate] = {};
+                }
+                if (!DB.meals[currentDate][mealType]) {
+                    DB.meals[currentDate][mealType] = [];
+                }
+                
+                // Aggiungi il pasto
+                DB.meals[currentDate][mealType].push({
+                    foodId,
+                    quantity
+                });
+                
+                // Aggiorna il diario alimentare
+                renderMeals(currentDate);
+                
+                // Aggiorna la dashboard se la data è oggi
+                if (currentDate === getToday()) {
+                    updateDashboard();
+                }
+                
+                // Chiudi il modale
+                hideModal('add-food-modal');
+                
+                // Resetta il form
+                document.getElementById('food-search-modal').value = '';
+                document.getElementById('food-search-results').innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center">Cerca un alimento</p>';
+                document.getElementById('selected-food-info').classList.add('hidden');
+            });
+            
+            // Handler per l'aggiunta di un alimento personalizzato
+            document.getElementById('save-custom-food').addEventListener('click', () => {
+                const name = document.getElementById('custom-food-name').value;
+                const calories = parseInt(document.getElementById('custom-food-calories').value);
+                const protein = parseFloat(document.getElementById('custom-food-protein').value);
+                const carbs = parseFloat(document.getElementById('custom-food-carbs').value);
+                const fat = parseFloat(document.getElementById('custom-food-fat').value);
+                const editId = document.getElementById('save-custom-food').dataset.editId;
+                
+                if (!name || isNaN(calories) || isNaN(protein) || isNaN(carbs) || isNaN(fat)) {
+                    alert('Tutti i campi sono obbligatori e devono essere numerici.');
+                    return;
+                }
+                
+                if (editId) {
+                    // Modifica un alimento esistente
+                    const foodIndex = DB.foods.findIndex(f => f.id === parseInt(editId));
+                    if (foodIndex !== -1) {
+                        DB.foods[foodIndex].name = name;
+                        DB.foods[foodIndex].calories = calories;
+                        DB.foods[foodIndex].protein = protein;
+                        DB.foods[foodIndex].carbs = carbs;
+                        DB.foods[foodIndex].fat = fat;
+                    }
+                } else {
+                    // Crea un nuovo alimento
+                    const newFood = {
+                        id: DB.foods.length + 1,
+                        name,
+                        calories,
+                        protein,
+                        carbs,
+                        fat,
+                        custom: true
+                    };
+                    
+                    DB.foods.push(newFood);
+                }
+                
+                // Aggiorna la libreria di alimenti
+                renderFoodLibrary();
+                
+                // Chiudi il modale
+                hideModal('create-food-modal');
+                
+                // Resetta il form
+                document.getElementById('custom-food-name').value = '';
+                document.getElementById('custom-food-calories').value = '';
+                document.getElementById('custom-food-protein').value = '';
+                document.getElementById('custom-food-carbs').value = '';
+                document.getElementById('custom-food-fat').value = '';
+                document.getElementById('save-custom-food').dataset.editId = '';
+                
+                alert(editId ? 'Alimento modificato con successo!' : 'Alimento aggiunto con successo!');
+            });
+            
+            // Handler per l'aggiunta di un'attività
+            document.getElementById('add-activity-submit').addEventListener('click', () => {
+                const type = document.getElementById('activity-type').value;
+                const distance = document.getElementById('activity-distance').value ? parseFloat(document.getElementById('activity-distance').value) : null;
+                const duration = document.getElementById('activity-duration').value ? parseInt(document.getElementById('activity-duration').value) : null;
+                const date = document.getElementById('activity-date').value || getToday();
+                
+                if (!type || (!distance && !duration)) {
+                    alert('Seleziona un tipo di attività e inserisci la distanza o la durata.');
+                    return;
+                }
+                
+                // Inizializza se necessario
+                if (!DB.activities[date]) {
+                    DB.activities[date] = [];
+                }
+                
+                // Aggiungi l'attività
+                DB.activities[date].push({
+                    type,
+                    distance,
+                    duration
+                });
+                
+                // Aggiorna la schermata delle attività
+                renderActivities(date);
+                
+                // Aggiorna la dashboard se la data è oggi
+                if (date === getToday()) {
+                    updateDashboard();
+                }
+                
+                // Aggiorna il grafico delle attività
+                renderActivityChart();
+                
+                // Chiudi il modale
+                hideModal('add-activity-modal');
+                
+                // Resetta il form
+                document.getElementById('activity-type').value = 'running';
+                document.getElementById('activity-distance').value = '';
+                document.getElementById('activity-duration').value = '';
+                document.getElementById('activity-date').value = '';
+            });
+            
+            // Handler per l'aggiunta di un'attività ricorrente
+            document.getElementById('add-recurring-submit').addEventListener('click', () => {
+                const type = document.getElementById('recurring-activity-type').value;
+                const distance = document.getElementById('recurring-distance').value ? parseFloat(document.getElementById('recurring-distance').value) : null;
+                const duration = document.getElementById('recurring-duration').value ? parseInt(document.getElementById('recurring-duration').value) : null;
+                const frequency = parseInt(document.getElementById('recurring-frequency').value);
+                
+                if (!type || (!distance && !duration) || isNaN(frequency)) {
+                    alert('Tutti i campi sono obbligatori.');
+                    return;
+                }
+                
+                // Raccogli i giorni selezionati
+                const days = [];
+                const dayMap = {
+                    'day-mon': 'mon',
+                    'day-tue': 'tue',
+                    'day-wed': 'wed',
+                    'day-thu': 'thu',
+                    'day-fri': 'fri',
+                    'day-sat': 'sat',
+                    'day-sun': 'sun'
+                };
+                
+                Object.keys(dayMap).forEach(id => {
+                    if (document.getElementById(id).checked) {
+                        days.push(dayMap[id]);
+                    }
+                });
+                
+                // Verifica che il numero di giorni selezionati corrisponda alla frequenza
+                if (days.length !== frequency) {
+                    alert(`Hai selezionato ${days.length} giorni, ma hai indicato una frequenza di ${frequency} volte a settimana.`);
+                    return;
+                }
+                
+                // Inizializza se necessario
+                if (!DB.recurringActivities) {
+                    DB.recurringActivities = [];
+                }
+                
+                // Aggiungi l'attività
+                DB.recurringActivities.push({
+                    type,
+                    distance,
+                    duration,
+                    frequency,
+                    days
+                });
+                
+                // Aggiorna la schermata delle attività ricorrenti
+                renderRecurringActivities();
+                
+                // Aggiorna la dashboard
+                updateDashboard();
+                
+                // Aggiorna il grafico delle attività
+                renderActivityChart();
+                
+                // Chiudi il modale
+                hideModal('recurring-activity-modal');
+                
+                // Resetta il form
+                document.getElementById('recurring-activity-type').value = 'running';
+                document.getElementById('recurring-distance').value = '';
+                document.getElementById('recurring-duration').value = '';
+                document.getElementById('recurring-frequency').value = '1';
+                document.querySelectorAll('[id^="day-"]').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+            });
+            
+            // Handler per l'aggiunta di un peso
+            document.getElementById('add-weight-submit').addEventListener('click', () => {
+                const weight = parseFloat(document.getElementById('weight-value').value);
+                const date = document.getElementById('weight-date').value || getToday();
+                const note = document.getElementById('weight-note').value;
+                
+                if (isNaN(weight) || weight <= 0) {
+                    alert('Inserisci un peso valido.');
+                    return;
+                }
+                
+                // Salva il peso
+                DB.weights[date] = {
+                    weight,
+                    note
+                };
+                
+                // Aggiorna il grafico del peso
+                renderWeightChart();
+                
+                // Aggiorna anche il peso corrente dell'utente
+                if (DB.currentUser) {
+                    DB.currentUser.weight = weight;
+                    document.getElementById('user-weight').value = weight;
+                    updateDashboard();
+                }
+                
+                // Chiudi il modale
+                hideModal('add-weight-modal');
+                
+                // Resetta il form
+                document.getElementById('weight-value').value = '';
+                document.getElementById('weight-date').value = '';
+                document.getElementById('weight-note').value = '';
+            });
+            
+            // Handler per l'aggiunta di una misurazione
+            document.getElementById('add-measurement').addEventListener('click', () => {
+                const type = document.getElementById('measurement-type').value;
+                const value = parseFloat(document.getElementById('measurement-value').value);
+                const date = document.getElementById('measurement-date').value || getToday();
+                
+                if (isNaN(value) || value <= 0) {
+                    alert('Inserisci un valore valido.');
+                    return;
+                }
+                
+                // Inizializza se necessario
+                if (!DB.measurements[date]) {
+                    DB.measurements[date] = {};
+                }
+                
+                // Salva la misurazione
+                DB.measurements[date][type] = value;
+                
+                // Aggiorna il grafico delle misurazioni
+                renderMeasurementsChart();
+                
+                // Resetta il form (solo valore)
+                document.getElementById('measurement-value').value = '';
+            });
+            
+            // Handler per l'aggiunta di una foto
+            document.getElementById('add-photo-submit').addEventListener('click', () => {
+                const file = document.getElementById('photo-file').files[0];
+                const date = document.getElementById('photo-date').value || getToday();
+                const note = document.getElementById('photo-note').value;
+                
+                if (!file) {
+                    alert('Seleziona una foto.');
+                    return;
+                }
+                
+                // Simula la memorizzazione della foto (in una vera app la salveremmo)
+                if (!DB.photos[date]) {
+                    DB.photos[date] = [];
+                }
+                
+                // Per simulare, generiamo un URL fittizio
+                const photoUrl = URL.createObjectURL(file);
+                
+                DB.photos[date].push({
+                    url: photoUrl,
+                    note
+                });
+                
+                // Aggiorna la galleria delle foto
+                renderPhotos();
+                
+                // Chiudi il modale
+                hideModal('add-photo-modal');
+                
+                // Resetta il form
+                document.getElementById('photo-file').value = '';
+                document.getElementById('photo-date').value = '';
+                document.getElementById('photo-note').value = '';
+            });
+            
+            // Handler per il salvataggio dei passi
+            document.getElementById('save-steps').addEventListener('click', () => {
+                if (!DB.currentUser) return;
+                
+                const steps = parseInt(document.getElementById('daily-steps').value);
+                
+                if (isNaN(steps) || steps < 0) {
+                    alert('Inserisci un numero valido di passi.');
+                    return;
+                }
+                
+                // Salva i passi
+                DB.currentUser.dailySteps = steps;
+                
+                // Aggiorna il TDEE e la dashboard
+                updateDashboard();
+                
+                alert('Passi giornalieri salvati con successo!');
+            });
+            
+            // Handler per il calcolo del TDEE
+            document.getElementById('recalculate-tdee').addEventListener('click', () => {
+                showModal('tdee-modal');
+                updateTDEECalculation();
+            });
+            
+            // Handler per il salvataggio dei risultati TDEE
+            document.getElementById('save-tdee-results').addEventListener('click', () => {
+                hideModal('tdee-modal');
+                alert('Valori TDEE applicati con successo!');
+            });
+            
+            // Handler per l'esportazione dei dati
+            document.getElementById('export-data').addEventListener('click', () => {
+                if (!DB.currentUser) return;
+                
+                // Raccogli i dati dell'utente
+                const userData = {
+                    user: DB.currentUser,
+                    meals: DB.meals,
+                    activities: DB.activities,
+                    recurringActivities: DB.recurringActivities,
+                    weights: DB.weights,
+                    measurements: DB.measurements,
+                    customFoods: DB.foods.filter(f => f.custom)
+                };
+                
+                // Converti in JSON
+                const jsonData = JSON.stringify(userData, null, 2);
+                
+                // Crea un Blob e un link per il download
+                const blob = new Blob([jsonData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `caltrack_data_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Cleanup
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 0);
+                
+                alert('Dati esportati con successo!');
+            });
+            
+            // Handler per l'importazione dei dati
+            document.getElementById('import-data').addEventListener('click', () => {
+                alert('Funzionalità di importazione non implementata in questa demo.');
+            });
+            
+            // Handler per l'eliminazione dell'account
+            document.getElementById('delete-account').addEventListener('click', () => {
+                if (!DB.currentUser) return;
+                
+                if (confirm('Sei sicuro di voler eliminare il tuo account? Questa azione non può essere annullata.')) {
+                    // Trova e rimuovi l'utente dal database
+                    const userIndex = DB.users.findIndex(u => u.id === DB.currentUser.id);
+                    if (userIndex !== -1) {
+                        DB.users.splice(userIndex, 1);
+                    }
+                    
+                    // Resetta i dati dell'utente corrente
+                    DB.currentUser = null;
+                    
+                    // Aggiorna l'interfaccia
+                    document.getElementById('login-btn').classList.remove('hidden');
+                    document.getElementById('user-info').classList.add('hidden');
+                    document.getElementById('user-info').classList.remove('flex');
+                    
+                    // Mostra la schermata di benvenuto
+                    showScreen('welcome');
+                    
+                    alert('Account eliminato con successo.');
+                }
+            });
+        }
+
+        function renderPhotos() {
+            const container = document.getElementById('photos-container');
+            container.innerHTML = '';
+            
+            const photoList = [];
+            
+            // Raccogli tutte le foto e ordinale per data
+            for (const date in DB.photos) {
+                DB.photos[date].forEach(photo => {
+                    photoList.push({
+                        date,
+                        url: photo.url,
+                        note: photo.note
+                    });
+                });
+            }
+            
+            photoList.sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            if (photoList.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 dark:text-gray-400 text-center col-span-full">Nessuna foto caricata</p>';
+                return;
+            }
+            
+            photoList.forEach(photo => {
+                const photoCard = document.createElement('div');
+                photoCard.className = 'border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden';
+                
+                const photoImg = document.createElement('img');
+                photoImg.src = photo.url;
+                photoImg.className = 'w-full h-40 object-cover';
+                photoImg.alt = 'Foto progresso';
+                
+                const photoInfo = document.createElement('div');
+                photoInfo.className = 'p-2 text-sm';
+                photoInfo.innerHTML = `
+                    <div class="font-medium">${new Date(photo.date).toLocaleDateString('it-IT')}</div>
+                    ${photo.note ? `<div class="text-xs text-gray-600 dark:text-gray-400">${photo.note}</div>` : ''}
+                `;
+                
+                photoCard.appendChild(photoImg);
+                photoCard.appendChild(photoInfo);
+                
+                container.appendChild(photoCard);
+            });
+        }
+
+        // Funzioni di inizializzazione
+        function setupEventListeners() {
+            // Navigazione
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.addEventListener('click', function() {
+                    const target = this.id.replace('nav-', '') || this.dataset.target;
+                    showScreen(target);
+                });
+            });
+            
+            // Apri/chiudi menu mobile
+            document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+                const mobileMenu = document.getElementById('mobile-menu');
+                mobileMenu.classList.toggle('hidden');
+            });
+            
+            // Login/register
+            document.getElementById('login-btn').addEventListener('click', function() {
+                showModal('login-modal');
+            });
+            
+            document.getElementById('start-login').addEventListener('click', function() {
+                showModal('login-modal');
+            });
+            
+            document.getElementById('start-register').addEventListener('click', function() {
+                showModal('register-modal');
+            });
+            
+            document.getElementById('switch-to-register').addEventListener('click', function() {
+                hideModal('login-modal');
+                showModal('register-modal');
+            });
+            
+            document.getElementById('switch-to-login').addEventListener('click', function() {
+                hideModal('register-modal');
+                showModal('login-modal');
+            });
+            
+            // Chiusura modali
+            document.querySelectorAll('.close-modal').forEach(button => {
+                button.addEventListener('click', function() {
+                    hideAllModals();
+                });
+            });
+            
+            // Aggiungi cibo
+            document.querySelectorAll('.add-food-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const mealType = this.dataset.meal;
+                    document.getElementById('food-meal').value = mealType;
+                    showModal('add-food-modal');
+                });
+            });
+            
+            document.getElementById('add-meal-btn').addEventListener('click', function() {
+                showModal('add-food-modal');
+            });
+            
+            document.getElementById('add-custom-food').addEventListener('click', function() {
+                document.getElementById('save-custom-food').dataset.editId = '';
+                showModal('create-food-modal');
+            });
+            
+            // Ricerca alimenti
+            document.getElementById('food-search').addEventListener('input', function() {
+                renderFoodLibrary();
+            });
+            
+            document.getElementById('food-search-modal').addEventListener('input', function() {
+                renderFoodSearchResults(this.value);
+            });
+            
+            // Aggiungi attività
+            document.getElementById('add-activity-btn').addEventListener('click', function() {
+                document.getElementById('activity-date').value = getToday();
+                showModal('add-activity-modal');
+            });
+            
+            document.getElementById('add-activity-form-btn').addEventListener('click', function() {
+                document.getElementById('activity-date').value = document.getElementById('activity-date').dataset.date || getToday();
+                showModal('add-activity-modal');
+            });
+            
+            document.getElementById('add-recurring-activity').addEventListener('click', function() {
+                showModal('recurring-activity-modal');
+            });
+            
+            // Cambio tipo di attività
+            document.getElementById('activity-type').addEventListener('change', function() {
+                const type = this.value;
+                const distanceContainer = document.getElementById('activity-distance-container');
+                
+                if (type === 'running' || type === 'walking' || type === 'cycling') {
+                    distanceContainer.classList.remove('hidden');
+                } else {
+                    distanceContainer.classList.add('hidden');
+                }
+            });
+            
+            document.getElementById('recurring-activity-type').addEventListener('change', function() {
+                const type = this.value;
+                const distanceContainer = document.getElementById('recurring-distance-container');
+                
+                if (type === 'running' || type === 'walking' || type === 'cycling') {
+                    distanceContainer.classList.remove('hidden');
+                } else {
+                    distanceContainer.classList.add('hidden');
+                }
+            });
+            
+            // Aggiungi peso
+            document.getElementById('add-weight').addEventListener('click', function() {
+                if (DB.currentUser) {
+                    document.getElementById('weight-value').value = DB.currentUser.weight;
+                }
+                document.getElementById('weight-date').value = getToday();
+                showModal('add-weight-modal');
+            });
+            
+            // Aggiungi foto
+            document.getElementById('add-photo').addEventListener('click', function() {
+                document.getElementById('photo-date').value = getToday();
+                showModal('add-photo-modal');
+            });
+            
+            // Navigazione date diario alimentare
+            document.getElementById('prev-date').addEventListener('click', function() {
+                const currentDateEl = document.getElementById('food-date');
+                let currentDate;
+                
+                if (currentDateEl.textContent === 'Oggi') {
+                    currentDate = new Date();
+                } else {
+                    currentDate = new Date(currentDateEl.dataset.date);
+                }
+                
+                // Vai al giorno precedente
+                currentDate.setDate(currentDate.getDate() - 1);
+                const newDateStr = formatDate(currentDate);
+                
+                currentDateEl.textContent = newDateStr === getToday() ? 'Oggi' : currentDate.toLocaleDateString('it-IT');
+                currentDateEl.dataset.date = newDateStr;
+                
+                renderMeals(newDateStr);
+            });
+            
+            document.getElementById('next-date').addEventListener('click', function() {
+                const currentDateEl = document.getElementById('food-date');
+                let currentDate;
+                
+                if (currentDateEl.textContent === 'Oggi') {
+                    return; // Già al giorno corrente
+                } else {
+                    currentDate = new Date(currentDateEl.dataset.date);
+                }
+                
+                // Vai al giorno successivo
+                currentDate.setDate(currentDate.getDate() + 1);
+                const newDateStr = formatDate(currentDate);
+                const today = getToday();
+                
+                // Non permettere di andare oltre la data odierna
+                if (newDateStr > today) {
+                    return;
+                }
+                
+                currentDateEl.textContent = newDateStr === today ? 'Oggi' : currentDate.toLocaleDateString('it-IT');
+                currentDateEl.dataset.date = newDateStr;
+                
+                renderMeals(newDateStr);
+            });
+            
+            // Navigazione date attività
+            document.getElementById('prev-activity-date').addEventListener('click', function() {
+                const currentDateEl = document.getElementById('activity-date');
+                let currentDate;
+                
+                if (currentDateEl.textContent === 'Oggi') {
+                    currentDate = new Date();
+                } else {
+                    currentDate = new Date(currentDateEl.dataset.date);
+                }
+                
+                // Vai al giorno precedente
+                currentDate.setDate(currentDate.getDate() - 1);
+                const newDateStr = formatDate(currentDate);
+                
+                currentDateEl.textContent = newDateStr === getToday() ? 'Oggi' : currentDate.toLocaleDateString('it-IT');
+                currentDateEl.dataset.date = newDateStr;
+                
+                renderActivities(newDateStr);
+            });
+            
+            document.getElementById('next-activity-date').addEventListener('click', function() {
+                const currentDateEl = document.getElementById('activity-date');
+                let currentDate;
+                
+                if (currentDateEl.textContent === 'Oggi') {
+                    return; // Già al giorno corrente
+                } else {
+                    currentDate = new Date(currentDateEl.dataset.date);
+                }
+                
+                // Vai al giorno successivo
+                currentDate.setDate(currentDate.getDate() + 1);
+                const newDateStr = formatDate(currentDate);
+                const today = getToday();
+                
+                // Non permettere di andare oltre la data odierna
+                if (newDateStr > today) {
+                    return;
+                }
+                
+                currentDateEl.textContent = newDateStr === today ? 'Oggi' : currentDate.toLocaleDateString('it-IT');
+                currentDateEl.dataset.date = newDateStr;
+                
+                renderActivities(newDateStr);
+            });
+            
+            // Cambia tipo di lavoro
+            document.getElementById('job-type').addEventListener('change', function() {
+                const customJobContainer = document.getElementById('custom-job-container');
+                if (this.value === 'custom') {
+                    customJobContainer.classList.remove('hidden');
+                } else {
+                    customJobContainer.classList.add('hidden');
+                }
+            });
+            
+            // Cambia timeframe grafico calorie
+            document.getElementById('chart-timeframe').addEventListener('change', function() {
+                renderCaloriesChart();
+            });
+            
+            // Cambia tipo di misurazione
+            document.getElementById('measurement-type').addEventListener('change', function() {
+                renderMeasurementsChart();
+            });
+            
+            // Cambia frequenza attività ricorrente
+            document.getElementById('recurring-frequency').addEventListener('change', function() {
+                const frequency = parseInt(this.value);
+                if (isNaN(frequency) || frequency < 1 || frequency > 7) return;
+                
+                // Resetta i checkbox
+                document.querySelectorAll('[id^="day-"]').forEach(checkbox => {
+                    checkbox.checked = false;
+                });
+            });
+        }
+
+        function initialize() {
+            // Inizializzazione data
+            document.getElementById('food-date').textContent = 'Oggi';
+            document.getElementById('food-date').dataset.date = getToday();
+            
+            document.getElementById('activity-date').textContent = 'Oggi';
+            document.getElementById('activity-date').dataset.date = getToday();
+            
+            // Imposta la data corrente nei campi data
+            const today = getToday();
+            document.getElementById('weight-date').value = today;
+            document.getElementById('measurement-date').value = today;
+            document.getElementById('photo-date').value = today;
+            document.getElementById('activity-date').value = today;
+            
+            // Inizializzazione utente di esempio (solo per la demo)
+            if (DB.users.length === 0) {
+                DB.users.push({
+                    id: 1,
+                    name: 'Utente Demo',
+                    email: 'demo@example.com',
+                    password: 'password',
+                    age: 30,
+                    gender: 'male',
+                    height: 175,
+                    weight: 75,
+                    bodyfat: null,
+                    goal: 'lose',
+                    deficit: 500,
+                    bmrFormula: 'mifflin',
+                    jobType: 'sedentary',
+                    jobHours: 8,
+                    jobDays: 5,
+                    customJobDescription: '',
+                    dailySteps: 5000
+                });
+            }
+            
+            // Imposta i listener per gli eventi
+            setupEventListeners();
+            
+            // Imposta i handler per i form
+            setupFormHandlers();
+            
+            // Mostra la schermata di benvenuto
+            showScreen('welcome');
+            
+            // Inizializza le librerie
+            renderFoodLibrary();
+        }
+        // Inizializza l'applicazione
+        initialize();
+    </script>
+</body>
+</html>
